@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{d0475003-409f-42cf-a71d-327e069944d9}</ProjectGuid>
+    <RootNamespace>testclang</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>ClangCL</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Program Files\LLVM\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(IncludePath)</IncludePath>
+    <ExternalIncludePath>C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\tools\clang\include\;C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\include\;C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\clang\include;C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\llvm\include;$(ExternalIncludePath)</ExternalIncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>C:\Program Files\LLVM\lib\libclang.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>Default</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>version.lib;C:\Program Files\LLVM\lib\libclang.lib;"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangARCMigrate.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangAST.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangASTMatchers.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangBasic.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangCrossTU.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangDriver.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangEdit.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangFormat.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangFrontend.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangFrontendTool.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangIndex.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangLex.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangParse.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangRewrite.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangRewriteFrontend.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangSema.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangSerialization.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangStaticAnalyzerCheckers.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangStaticAnalyzerCore.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangStaticAnalyzerFrontend.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangTooling.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangToolingCore.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangToolingInclusions.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64AsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64CodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64Desc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64Disassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64Info.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAArch64Utils.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAggressiveInstCombine.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAMDGPUUtils.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAnalysis.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMARMUtils.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAsmPrinter.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAVRAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAVRCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAVRDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAVRDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMAVRInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBinaryFormat.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBitReader.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBitstreamReader.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBitWriter.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBPFAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBPFCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBPFDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBPFDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMBPFInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMCFGuard.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMCore.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMCoroutines.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMCoverage.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMDebugInfoCodeView.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMDebugInfoDWARF.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMDebugInfoMSF.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMDemangle.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMExtensions.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMFrontendOpenMP.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMGlobalISel.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMHexagonAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMHexagonCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMHexagonDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMHexagonDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMHexagonInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMInstCombine.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMInstrumentation.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMipo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMIRReader.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLanaiAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLanaiCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLanaiDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLanaiDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLanaiInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLinker.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMLTO.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMC.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMCDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMCParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMipsAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMipsCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMipsDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMipsDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMipsInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMIRParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMSP430AsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMSP430CodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMSP430Desc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMSP430Disassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMMSP430Info.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMNVPTXCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMNVPTXDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMNVPTXInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMObjCARCOpts.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMObject.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMOption.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPasses.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPowerPCAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPowerPCCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPowerPCDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPowerPCDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMPowerPCInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMProfileData.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRemarks.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRISCVAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRISCVCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRISCVDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRISCVDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMRISCVInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMScalarOpts.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSelectionDAG.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSparcAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSparcCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSparcDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSparcDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSparcInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSupport.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSystemZAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSystemZCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSystemZDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSystemZDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMSystemZInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMTableGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMTableGenGlobalISel.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMTarget.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMTextAPI.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMTransformUtils.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMVectorize.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyAsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMWebAssemblyUtils.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMX86AsmParser.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMX86CodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMX86Desc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMX86Disassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMX86Info.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMXCoreCodeGen.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMXCoreDesc.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMXCoreDisassembler.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\LLVMXCoreInfo.lib";"C:\Users\Admin\Downloads\proj\proj\compiled_clang\llvm-project\_build_llvm\Debug\lib\clangAnalysis.lib";%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="test-clang.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CastAlert.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
