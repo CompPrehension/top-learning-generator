@@ -80,6 +80,30 @@ private:
 };
 
 
+class ExpressionVarNode : public ExpressionDomainNode
+{
+public:
+	ExpressionVarNode(string name, ExpressionDomainNode* init)
+		: name(name), init(init)
+	{
+	}
+	~ExpressionVarNode()
+	{
+		delete this->init;
+	}
+
+	ExpressionDomainNode* getInit() { return this->init; }
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "Var" << " " << this->name << " with initial value:" << "\n";
+		this->init->dump(level + 1);
+	}
+
+private:
+	string name;
+	ExpressionDomainNode* init;
+};
+
 class ExpressionConstNode : public ExpressionDomainNode
 {
 public:

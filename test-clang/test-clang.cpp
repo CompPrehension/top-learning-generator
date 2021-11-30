@@ -39,9 +39,15 @@ public:
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("match"))
         {
             auto dstNode = mapToDst(node);
-            dstNode->dump();
-
+            
+            node->dump();
             printf_s("\n");
+            dstNode->dump();
+            printf_s("\n");
+            printf_s("\n");
+            printf_s("\n");
+
+
             //auto teeemp = FS->getExprLoc();
             //int x = 0;
             //FS->getExprLoc().dump();
@@ -86,6 +92,25 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node) {
         auto value = intValue->getValue().convertToFloat();
         auto valueS = to_string(value);
         return new ExpressionConstNode(valueS);
+    }
+    if (auto implCast = dyn_cast<clang::ImplicitCastExpr>(node))
+    {
+        return mapToDst(implCast->getSubExpr());
+    }
+    if (auto callExpr = dyn_cast<clang::CallExpr>(node))
+    {
+        callExpr->arguments();
+
+        return new ExpressionDomainEmptyNode();
+    }
+    if (auto declRef = dyn_cast<clang::DeclRefExpr>(node))
+    {
+        if (auto varDecl = dyn_cast<clang::VarDecl>(declRef->getDecl()))
+        {
+            auto initValue = varDecl->getInit();
+            auto name = varDecl->getNameAsString();
+            return new ExpressionVarNode(name, mapToDst(initValue));
+        }
     }
 
     //node->dump();
