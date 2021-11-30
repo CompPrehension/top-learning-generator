@@ -104,6 +104,37 @@ private:
 	ExpressionDomainNode* init;
 };
 
+
+class ExpressionFuncCallNode : public ExpressionDomainNode
+{
+public:
+	ExpressionFuncCallNode(string name, vector<ExpressionDomainNode*> args)
+		: name(name), args(args)
+	{
+	}
+	~ExpressionFuncCallNode()
+	{
+		for (auto* arg : this->args)
+		{
+			delete arg;
+		}
+	}
+	
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "FuncCall" << " " << this->name << " with args value:" << "\n";
+		for (auto* arg : this->args)
+		{
+			arg->dump(level + 1);
+		}
+	}
+
+private:
+	string name;
+	vector<ExpressionDomainNode*> args;
+};
+
+
 class ExpressionConstNode : public ExpressionDomainNode
 {
 public:

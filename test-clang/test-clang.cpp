@@ -99,9 +99,17 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node) {
     }
     if (auto callExpr = dyn_cast<clang::CallExpr>(node))
     {
-        callExpr->arguments();
+        if (auto funcDecl = dyn_cast<clang::FunctionDecl>(callExpr->getCalleeDecl()))
+        {
+            auto name = funcDecl->getNameAsString();
 
-        return new ExpressionDomainEmptyNode();
+            auto args = vector<ExpressionDomainNode*>();
+            for (auto* arg : callExpr->arguments())
+            {
+                args.push_back(mapToDst(arg));
+            }
+            return new ExpressionFuncCallNode(name, args);
+        }
     }
     if (auto declRef = dyn_cast<clang::DeclRefExpr>(node))
     {
