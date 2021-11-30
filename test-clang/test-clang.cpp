@@ -3,9 +3,10 @@
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
 // Declares llvm::cl::extrahelp.
-#include "llvm/Support/CommandLine.h"
+//#include "llvm/Support/CommandLine.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include "ExpressionDomainNodes.h"
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -23,14 +24,75 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...\n");
 
+ExpressionDomainNode* mapToDst(const clang::Expr* node);
+
 
 class ExprPrinter : public MatchFinder::MatchCallback {
 public:
     virtual void run(const MatchFinder::MatchResult& Result) {
-        if (auto FS = Result.Nodes.getNodeAs<clang::Expr>("myExpr"))
+
+        //auto nodeMap = Result.Nodes.getMap();
+        //auto sourceMgr = Result.SourceManager;
+        //auto test = (*nodeMap.find("op_plus")).second;
+        //Result.SourceManager->getExpansionLoc()
+
+        if (auto node = Result.Nodes.getNodeAs<clang::Expr>("match"))
+        {
+            auto dstNode = mapToDst(node);
+            dstNode->dump();
+
+            printf_s("\n");
+            //auto teeemp = FS->getExprLoc();
+            //int x = 0;
+            //FS->getExprLoc().dump();
+            //FS->
+
+            //FS->getType()->dump();
+            //FS->dump();
+        }
+        /*if (auto FS = Result.Nodes.getNodeAs<clang::Expr>("op_mul"))
+        {
+            FS->getType()->dump();
             FS->dump();
+        }*/
     }
 };
+
+ExpressionDomainNode* mapToDst(const clang::Expr* node) {
+    
+    //node->get
+    //node->dump();
+    //auto opName = string(*internal::getEx(*node));
+    
+    if (auto binaryOperator = dyn_cast<clang::BinaryOperator>(node))
+    {
+        auto left = mapToDst(binaryOperator->getLHS());
+        auto right = mapToDst(binaryOperator->getRHS());
+        return new ExpressionBinaryOperatorNode(string(*internal::getOpName(*binaryOperator)), left, right);
+    }
+    if (auto unaryOperator = dyn_cast<clang::UnaryOperator>(node))
+    {
+        auto child = mapToDst(unaryOperator->getSubExpr());
+        return new ExpressionUnaryOperatorNode(string(*internal::getOpName(*unaryOperator)), child);
+    }
+    if (auto intValue = dyn_cast<clang::IntegerLiteral>(node))
+    {
+        auto value = intValue->getValue().getZExtValue();
+        auto valueS = to_string(value);
+        return new ExpressionConstNode(valueS);
+    }
+    if (auto intValue = dyn_cast<clang::FloatingLiteral>(node))
+    {
+        auto value = intValue->getValue().convertToFloat();
+        auto valueS = to_string(value);
+        return new ExpressionConstNode(valueS);
+    }
+
+    //node->dump();
+    return new ExpressionDomainEmptyNode();
+
+    //throw string("unsopported node type. rollback");
+}
 
 int main(int argc, const char** argv) {
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
@@ -43,8 +105,32 @@ int main(int argc, const char** argv) {
     CommonOptionsParser& OptionsParser = ExpectedParser.get();
     ClangTool Tool(OptionsParser.getCompilations(),
         OptionsParser.getSourcePathList());
+    /*
+    auto matcher = expr(
+        binaryOperator(anyOf(
+            hasOperatorName("+"),
+            //hasOperatorName("-"),
+            //hasOperatorName("*"),
+            hasOperatorName("/")
+        )).bind("match")
+    );
+    */
 
-    auto matcher = binaryOperator(hasOperatorName("+")).bind("myExpr");
+    auto matcher = expr(
+        //constantExpr(),
+        anyOf(
+            binaryOperator(hasOperatorName("+")),
+            binaryOperator(hasOperatorName("-")),
+            binaryOperator(hasOperatorName("*")),
+            binaryOperator(hasOperatorName("/")),
+            unaryOperator(hasOperatorName("-")),
+            unaryOperator(hasOperatorName("++")),
+            unaryOperator(hasOperatorName("--")),
+            binaryOperator(isAssignmentOperator()),
+            binaryOperator(isComparisonOperator()),
+            cxxMemberCallExpr()
+        )
+    ).bind("match");
 
     ExprPrinter Printer;
     MatchFinder Finder;
