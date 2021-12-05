@@ -7,6 +7,7 @@
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "ExpressionDomainNodes.h"
+#include "helpers.h"
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -24,7 +25,7 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...\n");
 
-ExpressionDomainNode* mapToDst(const clang::Expr* node);
+ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr);
 
 
 class ExprPrinter : public MatchFinder::MatchCallback {
@@ -35,10 +36,11 @@ public:
         //auto sourceMgr = Result.SourceManager;
         //auto test = (*nodeMap.find("op_plus")).second;
         //Result.SourceManager->getExpansionLoc()
+        //Result.SourceManager
 
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("match"))
         {
-            auto dstNode = mapToDst(node);
+            auto dstNode = mapToDst(node, Result.SourceManager);
             
             node->dump();
             printf_s("\n");
@@ -64,7 +66,8 @@ public:
     }
 };
 
-ExpressionDomainNode* mapToDst(const clang::Expr* node) {
+
+ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr) {
     
     //node->get
     //node->dump();
@@ -72,30 +75,34 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node) {
     
     if (auto binaryOperator = dyn_cast<clang::BinaryOperator>(node))
     {
-        auto left = mapToDst(binaryOperator->getLHS());
-        auto right = mapToDst(binaryOperator->getRHS());
-        return new ExpressionBinaryOperatorNode(string(*internal::getOpName(*binaryOperator)), left, right);
+        auto left = mapToDst(binaryOperator->getLHS(), sourceMgr);
+        auto right = mapToDst(binaryOperator->getRHS(), sourceMgr);
+        return new ExpressionDomainBinaryOperatorNode((clang::BinaryOperator*)binaryOperator, string(*internal::getOpName(*binaryOperator)), left, right);
     }
     if (auto unaryOperator = dyn_cast<clang::UnaryOperator>(node))
     {
-        auto child = mapToDst(unaryOperator->getSubExpr());
-        return new ExpressionUnaryOperatorNode(string(*internal::getOpName(*unaryOperator)), child);
+        auto child = mapToDst(unaryOperator->getSubExpr(), sourceMgr);
+        return new ExpressionDomainUnaryOperatorNode((clang::UnaryOperator*)unaryOperator, string(*internal::getOpName(*unaryOperator)), child);
     }
     if (auto intValue = dyn_cast<clang::IntegerLiteral>(node))
     {
         auto value = intValue->getValue().getZExtValue();
         auto valueS = to_string(value);
-        return new ExpressionConstNode(valueS);
+        return new ExpressionDomainConstNode((clang::Stmt*)node, valueS);
     }
-    if (auto intValue = dyn_cast<clang::FloatingLiteral>(node))
+    if (auto intValue = dyn_cast<clang::FloatingLiteral>((clang::Stmt*)node))
     {
         auto value = intValue->getValue().convertToFloat();
         auto valueS = to_string(value);
-        return new ExpressionConstNode(valueS);
+        return new ExpressionDomainConstNode((clang::Stmt*)node, valueS);
     }
     if (auto implCast = dyn_cast<clang::ImplicitCastExpr>(node))
     {
-        return mapToDst(implCast->getSubExpr());
+        return mapToDst(implCast->getSubExpr(), sourceMgr);
+    }
+    if (auto explicitCast = dyn_cast<clang::ExplicitCastExpr>(node))
+    {
+        return mapToDst(explicitCast->getSubExpr(), sourceMgr);
     }
     if (auto callExpr = dyn_cast<clang::CallExpr>(node))
     {
@@ -106,9 +113,9 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node) {
             auto args = vector<ExpressionDomainNode*>();
             for (auto* arg : callExpr->arguments())
             {
-                args.push_back(mapToDst(arg));
+                args.push_back(mapToDst(arg, sourceMgr));
             }
-            return new ExpressionFuncCallNode(name, args);
+            return new ExpressionDomainFuncCallNode((clang::CallExpr*)node, name, args);
         }
     }
     if (auto declRef = dyn_cast<clang::DeclRefExpr>(node))
@@ -117,14 +124,18 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node) {
         {
             auto initValue = varDecl->getInit();
             auto name = varDecl->getNameAsString();
-            return new ExpressionVarNode(name, mapToDst(initValue));
+            return new ExpressionDomainVarNode((clang::DeclRefExpr*)node, name, mapToDst(initValue, sourceMgr));
         }
     }
+    /*
+    if (auto funcDecl = dyn_cast<clang::FunctionDecl>(node))
+    {
 
-    //node->dump();
-    return new ExpressionDomainEmptyNode();
+    }
+    */
 
-    //throw string("unsopported node type. rollback");
+    auto undefinedsource = get_source_text_raw(node->getSourceRange(), *sourceMgr);
+    return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
 }
 
 int main(int argc, const char** argv) {

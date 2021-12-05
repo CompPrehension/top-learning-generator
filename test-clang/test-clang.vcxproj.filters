@@ -18,12 +18,15 @@
     <ClCompile Include="test-clang.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="helpers.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CastAlert.h">
+    <ClInclude Include="ExpressionDomainNodes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="ExpressionDomainNodes.h">
+    <ClInclude Include="helpers.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

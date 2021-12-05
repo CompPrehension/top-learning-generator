@@ -2,37 +2,53 @@
 #include <string>
 
 using namespace std;
+using namespace clang;
 
 class ExpressionDomainNode
 {
 public:
+	ExpressionDomainNode(Stmt* astNode) 
+		: astNode(astNode)
+	{
+	}
+
 	virtual ~ExpressionDomainNode()
 	{
-
 	}
 
 	virtual void dump(int level = 0) = 0;
+
+	Stmt* getAstNode() { return this->astNode; };
+
+private:
+	Stmt* astNode;
 };
 
 
-class ExpressionDomainEmptyNode : public ExpressionDomainNode
+class ExpressionDomainUndefinedNode : public ExpressionDomainNode
 {
 public:
+	ExpressionDomainUndefinedNode(Stmt* astNode)
+		: ExpressionDomainNode(astNode)
+	{
+	}
+
 	void dump(int level = 0)
 	{
-		llvm::outs() << string(level, ' ') << "EmptyNode" << "\n";
+		llvm::outs() << string(level, ' ') << "Undefined" << "\n";
 	}
 };
 
 
-class ExpressionBinaryOperatorNode : public ExpressionDomainNode
+class ExpressionDomainBinaryOperatorNode : public ExpressionDomainNode
 {
 public:
-	ExpressionBinaryOperatorNode(string type, ExpressionDomainNode* left, ExpressionDomainNode* right) 
-		: type(type), leftChild(left), rightChild(right)
+	ExpressionDomainBinaryOperatorNode(clang::BinaryOperator* astNode, string type, ExpressionDomainNode* left, ExpressionDomainNode* right)
+		: ExpressionDomainNode(astNode), type(type), leftChild(left), rightChild(right)
 	{
+		
 	}
-	~ExpressionBinaryOperatorNode()
+	virtual ~ExpressionDomainBinaryOperatorNode()
 	{
 		delete this->leftChild;
 		delete this->rightChild;
@@ -54,14 +70,15 @@ private:
 	ExpressionDomainNode* rightChild;
 };
 
-class ExpressionUnaryOperatorNode : public ExpressionDomainNode
+class ExpressionDomainUnaryOperatorNode : public ExpressionDomainNode
 {
 public:
-	ExpressionUnaryOperatorNode(string type, ExpressionDomainNode* child)
-		: type(type), child(child)
+	ExpressionDomainUnaryOperatorNode(clang::UnaryOperator* astNode, string type, ExpressionDomainNode* child)
+		: ExpressionDomainNode(astNode), type(type), child(child)
 	{
+		this->opCode = astNode->getOpcode();
 	}
-	~ExpressionUnaryOperatorNode()
+	virtual ~ExpressionDomainUnaryOperatorNode()
 	{
 		delete this->child;
 	}
@@ -77,17 +94,18 @@ public:
 private:
 	string type;
 	ExpressionDomainNode* child;
+	UnaryOperatorKind opCode;
 };
 
 
-class ExpressionVarNode : public ExpressionDomainNode
+class ExpressionDomainVarNode : public ExpressionDomainNode
 {
 public:
-	ExpressionVarNode(string name, ExpressionDomainNode* init)
-		: name(name), init(init)
+	ExpressionDomainVarNode(clang::DeclRefExpr* astNode, string name, ExpressionDomainNode* init)
+		: ExpressionDomainNode(astNode), name(name), init(init)
 	{
 	}
-	~ExpressionVarNode()
+	virtual ~ExpressionDomainVarNode()
 	{
 		delete this->init;
 	}
@@ -104,15 +122,41 @@ private:
 	ExpressionDomainNode* init;
 };
 
-
-class ExpressionFuncCallNode : public ExpressionDomainNode
+/*
+class ExpressionDomainExplicitCastNode : public ExpressionDomainNode
 {
 public:
-	ExpressionFuncCallNode(string name, vector<ExpressionDomainNode*> args)
-		: name(name), args(args)
+	ExpressionDomainExplicitCastNode(string name, ExpressionDomainNode* init)
+		: name(name), init(init)
 	{
 	}
-	~ExpressionFuncCallNode()
+	~ExpressionDomainExplicitCastNode()
+	{
+		delete this->init;
+	}
+
+	ExpressionDomainNode* getInit() { return this->init; }
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "ExplicitCast to" << " " << this->name << " with initial value:" << "\n";
+		this->subexpr->dump(level + 1);
+	}
+
+private:
+	string name;
+	ExpressionDomainNode* subexpr;
+};
+*/
+
+
+class ExpressionDomainFuncCallNode : public ExpressionDomainNode
+{
+public:
+	ExpressionDomainFuncCallNode(clang::CallExpr* astNode, string name, vector<ExpressionDomainNode*> args)
+		: ExpressionDomainNode(astNode), name(name), args(args)
+	{
+	}
+	~ExpressionDomainFuncCallNode()
 	{
 		for (auto* arg : this->args)
 		{
@@ -135,11 +179,11 @@ private:
 };
 
 
-class ExpressionConstNode : public ExpressionDomainNode
+class ExpressionDomainConstNode : public ExpressionDomainNode
 {
 public:
-	ExpressionConstNode(string value)
-		: value(value)
+	ExpressionDomainConstNode(Stmt* astNode, string value)
+		: ExpressionDomainNode(astNode), value(value)
 	{
 	}
 
