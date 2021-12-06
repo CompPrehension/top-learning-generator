@@ -25,6 +25,9 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...\n");
 
+
+bool isValidNode(ExpressionDomainNode* node);
+void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operatorsCount);
 ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr);
 
 
@@ -38,9 +41,12 @@ public:
         //Result.SourceManager->getExpansionLoc()
         //Result.SourceManager
 
-        if (auto node = Result.Nodes.getNodeAs<clang::Expr>("match"))
+        if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
             auto dstNode = mapToDst(node, Result.SourceManager);
+
+            if (!isValidNode(dstNode))
+                return;
             
             node->dump();
             printf_s("\n");
@@ -50,6 +56,10 @@ public:
             printf_s("\n");
 
 
+
+
+
+
             //auto teeemp = FS->getExprLoc();
             //int x = 0;
             //FS->getExprLoc().dump();
@@ -57,6 +67,8 @@ public:
 
             //FS->getType()->dump();
             //FS->dump();
+
+            delete dstNode;
         }
         /*if (auto FS = Result.Nodes.getNodeAs<clang::Expr>("op_mul"))
         {
@@ -67,11 +79,75 @@ public:
 };
 
 
+bool isValidNode(ExpressionDomainNode* node)
+{
+    bool isValid = true;
+    int operatorsCount = 0;
+    isValidNodeInner(node, isValid, operatorsCount);
+    return isValid && operatorsCount >= 2;
+}
+
+
+void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operatorsCount)
+{
+    if (node == nullptr || !_isValid)
+        return;
+
+    if (auto tmp = dynamic_cast<ExpressionDomainUndefinedNode*>(node))
+    {
+        _isValid = false;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainBinaryOperatorNode*>(node))
+    {
+        isValidNodeInner(tmp->getLeftChild(), _isValid, operatorsCount);
+        isValidNodeInner(tmp->getRightChild(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainUnaryOperatorNode*>(node))
+    {
+        isValidNodeInner(tmp->getChild(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainVarNode*>(node))
+    {
+        isValidNodeInner(tmp->getInit(), _isValid, operatorsCount);
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainFuncCallNode*>(node))
+    {
+        for (auto* arg : tmp->getArgs())
+        {
+            isValidNodeInner(arg, _isValid, operatorsCount);
+        }
+        ++operatorsCount;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainConstNode*>(node))
+    {        
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainMemberExprNode*>(node))
+    {
+        isValidNodeInner(tmp->getLeftValue(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainArrayBracketNode*>(node))
+    {
+        isValidNodeInner(tmp->getArrayExpr(), _isValid, operatorsCount);
+        isValidNodeInner(tmp->getIndexExpr(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
+}
+
 ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr) {
     
-    //node->get
-    //node->dump();
-    //auto opName = string(*internal::getEx(*node));
+    if (node == nullptr)
+        return nullptr;
     
     if (auto binaryOperator = dyn_cast<clang::BinaryOperator>(node))
     {
@@ -104,8 +180,14 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     {
         return mapToDst(explicitCast->getSubExpr(), sourceMgr);
     }
+    if (auto explicitCast = dyn_cast<clang::CStyleCastExpr>(node))
+    {
+        return mapToDst(explicitCast->getSubExpr(), sourceMgr);
+    }
     if (auto callExpr = dyn_cast<clang::CallExpr>(node))
     {
+        //auto temp = mapToDst(callExpr->getCallee(), sourceMgr);
+
         if (auto funcDecl = dyn_cast<clang::FunctionDecl>(callExpr->getCalleeDecl()))
         {
             auto name = funcDecl->getNameAsString();
@@ -117,6 +199,7 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
             }
             return new ExpressionDomainFuncCallNode((clang::CallExpr*)node, name, args);
         }
+        int x = 0;
     }
     if (auto declRef = dyn_cast<clang::DeclRefExpr>(node))
     {
@@ -124,8 +207,21 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
         {
             auto initValue = varDecl->getInit();
             auto name = varDecl->getNameAsString();
-            return new ExpressionDomainVarNode((clang::DeclRefExpr*)node, name, mapToDst(initValue, sourceMgr));
+            return new ExpressionDomainVarNode((clang::DeclRefExpr*)node, name, initValue != nullptr ? mapToDst(initValue, sourceMgr) : nullptr);
         }
+    }
+    if (auto membExpr = dyn_cast<clang::MemberExpr>(node))
+    {
+        auto left = mapToDst(membExpr->getBase(), sourceMgr);
+        auto right = membExpr->getMemberDecl()->getNameAsString();
+        
+        return new ExpressionDomainMemberExprNode((clang::MemberExpr*)membExpr, left, right);
+    }
+    if (auto arr_sub_expr = dyn_cast<clang::ArraySubscriptExpr>(node))
+    {
+        auto left = mapToDst(arr_sub_expr->getBase(), sourceMgr);
+        auto right = mapToDst(arr_sub_expr->getIdx(), sourceMgr);
+        return new ExpressionDomainArrayBracketNode((clang::ArraySubscriptExpr*)arr_sub_expr, left, right);
     }
     /*
     if (auto funcDecl = dyn_cast<clang::FunctionDecl>(node))
@@ -136,6 +232,12 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
 
     auto undefinedsource = get_source_text_raw(node->getSourceRange(), *sourceMgr);
     return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
+}
+
+
+std::string treeToExressionDomainRdfString(ExpressionDomainNode* tree)
+{
+
 }
 
 int main(int argc, const char** argv) {
@@ -174,7 +276,7 @@ int main(int argc, const char** argv) {
             binaryOperator(isComparisonOperator()),
             cxxMemberCallExpr()
         )
-    ).bind("match");
+    ).bind("exressionDomain");
 
     ExprPrinter Printer;
     MatchFinder Finder;

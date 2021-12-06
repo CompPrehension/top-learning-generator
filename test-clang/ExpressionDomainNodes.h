@@ -50,8 +50,10 @@ public:
 	}
 	virtual ~ExpressionDomainBinaryOperatorNode()
 	{
-		delete this->leftChild;
-		delete this->rightChild;
+		if (this->leftChild)
+			delete this->leftChild;
+		if (this->rightChild)
+			delete this->rightChild;
 	}
 
 	string& getType() { return this->type; }
@@ -60,8 +62,10 @@ public:
 	void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "BinaryOperator" << " " << this->type << " " << "\n";
-		this->leftChild->dump(level + 1);
-		this->rightChild->dump(level + 1);
+		if (this->leftChild)
+			this->leftChild->dump(level + 1);
+		if (this->rightChild)
+			this->rightChild->dump(level + 1);
 	}
 
 private:
@@ -80,7 +84,8 @@ public:
 	}
 	virtual ~ExpressionDomainUnaryOperatorNode()
 	{
-		delete this->child;
+		if (this->child)
+			delete this->child;
 	}
 
 	string& getType() { return this->type; }
@@ -88,7 +93,8 @@ public:
 	void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "UnaryOperator" << " " << this->type << " " << "\n";
-		this->child->dump(level + 1);
+		if (this->child)
+			this->child->dump(level + 1);
 	}
 
 private:
@@ -107,14 +113,19 @@ public:
 	}
 	virtual ~ExpressionDomainVarNode()
 	{
-		delete this->init;
+		if (this->init)
+			delete this->init;
 	}
 
 	ExpressionDomainNode* getInit() { return this->init; }
 	void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Var" << " " << this->name << " with initial value:" << "\n";
-		this->init->dump(level + 1);
+		if (this->init)
+		{
+			llvm::outs() << string(level, ' ') << "with initial value:" << "\n";
+			this->init->dump(level + 1);
+		}
 	}
 
 private:
@@ -160,7 +171,8 @@ public:
 	{
 		for (auto* arg : this->args)
 		{
-			delete arg;
+			if (arg)
+				delete arg;
 		}
 	}
 	
@@ -169,8 +181,14 @@ public:
 		llvm::outs() << string(level, ' ') << "FuncCall" << " " << this->name << " with args value:" << "\n";
 		for (auto* arg : this->args)
 		{
-			arg->dump(level + 1);
+			if (arg)
+				arg->dump(level + 1);
 		}
+	}
+
+	vector<ExpressionDomainNode*>& getArgs() 
+	{
+		return this->args;
 	}
 
 private:
@@ -197,5 +215,71 @@ private:
 	string value;
 };
 
+
+class ExpressionDomainMemberExprNode : public ExpressionDomainNode
+{
+public:
+	ExpressionDomainMemberExprNode(MemberExpr* astNode, ExpressionDomainNode* leftValue, string rightValue)
+		: ExpressionDomainNode(astNode), leftValue(leftValue), rightValue(rightValue)
+	{
+	}
+	~ExpressionDomainMemberExprNode()
+	{
+		if (leftValue)
+			delete leftValue;
+	}
+
+	//string& getValue() { return this->value; }
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "Member expr from " << "\n";
+		if (this->leftValue)
+			this->leftValue->dump(level + 1);
+		llvm::outs() << string(level, ' ') << " to " << this->rightValue << "\n";
+	}
+
+	ExpressionDomainNode* getLeftValue() 
+	{
+		return this->leftValue;
+	}
+
+private:
+	ExpressionDomainNode* leftValue;
+	string rightValue;
+};
+
+
+class ExpressionDomainArrayBracketNode : public ExpressionDomainNode
+{
+public:
+	ExpressionDomainArrayBracketNode(ArraySubscriptExpr* astNode, ExpressionDomainNode* arrayExpr, ExpressionDomainNode* indexExpr)
+		: ExpressionDomainNode(astNode), arrayExpr(arrayExpr), indexExpr(indexExpr)
+	{
+	}
+	~ExpressionDomainArrayBracketNode()
+	{
+		if (arrayExpr)
+			delete arrayExpr;
+		if (indexExpr)
+			delete indexExpr;
+	}
+
+	//string& getValue() { return this->value; }
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "Array brackets for " << "\n";
+		if (this->arrayExpr)
+			this->arrayExpr->dump(level + 1);
+		llvm::outs() << string(level, ' ') << "index expr" << "\n";
+		if (this->indexExpr)
+			this->indexExpr->dump(level + 1);
+	}
+
+	ExpressionDomainNode* getArrayExpr() { return this->arrayExpr; }
+	ExpressionDomainNode* getIndexExpr() { return this->indexExpr; }
+private:
+	ExpressionDomainNode* arrayExpr;
+	ExpressionDomainNode* indexExpr;
+};
 
 
