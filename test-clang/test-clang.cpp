@@ -11,6 +11,8 @@
 #include <iostream>
 #include "ExpressionDomainRdfNode.h"
 
+#include <fstream>
+
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
 using namespace llvm;
@@ -33,9 +35,11 @@ void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operators
 ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr);
 void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionDomainRdfNode>& acc, int& index);
 vector<ExpressionDomainRdfNode> mapToExressionDomainRdfNodes(ExpressionDomainNode* node);
+string rdfTreeToString(string stingExpr, vector<ExpressionDomainRdfNode>& nodes);
 
 
 class ExprPrinter : public MatchFinder::MatchCallback {
+    int counter = 0;
 public:
     virtual void run(const MatchFinder::MatchResult& Result) {
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
@@ -47,11 +51,17 @@ public:
                 if (!isValidNode(dstNode))
                     return;
 
-                std::cout << dstNode->toString();
-                std::cout << "\n";
+                //std::cout << dstNode->toString();
+                //std::cout << "\n";
 
+                auto stringRepr = dstNode->toString();
                 auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
-                int x = 0;
+                auto rdfString = rdfTreeToString(stringRepr, rdfTree);
+
+
+                string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\output\\expression_" + to_string(++counter) + ".rdf";
+                std::ofstream file(filename);
+                file << rdfString;
 
             } __finally {
                 if (dstNode)
@@ -216,6 +226,19 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     auto undefinedsource = get_source_text_raw(node->getSourceRange(), *sourceMgr);
     return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
 }
+
+string rdfTreeToString(string stingExpr, vector<ExpressionDomainRdfNode>& nodes)
+{
+    std::stringstream ss;
+    ss << "# string expression representation: " << stingExpr << "\n";
+    for (auto& node : nodes)
+    {
+        ss << "\n\n" << node.toString();
+    }
+    ss << "\n";
+    return ss.str();
+}
+
 
 vector<ExpressionDomainRdfNode> mapToExressionDomainRdfNodes(ExpressionDomainNode* node)
 {
