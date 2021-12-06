@@ -8,6 +8,8 @@
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "ExpressionDomainNodes.h"
 #include "helpers.h"
+#include <iostream>
+#include "ExpressionDomainRdfNode.h"
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -29,52 +31,33 @@ static cl::extrahelp MoreHelp("\nMore help text...\n");
 bool isValidNode(ExpressionDomainNode* node);
 void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operatorsCount);
 ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr);
+void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionDomainRdfNode>& acc, int& index);
+vector<ExpressionDomainRdfNode> mapToExressionDomainRdfNodes(ExpressionDomainNode* node);
 
 
 class ExprPrinter : public MatchFinder::MatchCallback {
 public:
     virtual void run(const MatchFinder::MatchResult& Result) {
-
-        //auto nodeMap = Result.Nodes.getMap();
-        //auto sourceMgr = Result.SourceManager;
-        //auto test = (*nodeMap.find("op_plus")).second;
-        //Result.SourceManager->getExpansionLoc()
-        //Result.SourceManager
-
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
-            auto dstNode = mapToDst(node, Result.SourceManager);
+            ExpressionDomainNode* dstNode;
+            __try {
+                dstNode = mapToDst(node, Result.SourceManager);
 
-            if (!isValidNode(dstNode))
-                return;
-            
-            node->dump();
-            printf_s("\n");
-            dstNode->dump();
-            printf_s("\n");
-            printf_s("\n");
-            printf_s("\n");
+                if (!isValidNode(dstNode))
+                    return;
 
+                std::cout << dstNode->toString();
+                std::cout << "\n";
 
+                auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
+                int x = 0;
 
-
-
-
-            //auto teeemp = FS->getExprLoc();
-            //int x = 0;
-            //FS->getExprLoc().dump();
-            //FS->
-
-            //FS->getType()->dump();
-            //FS->dump();
-
-            delete dstNode;
+            } __finally {
+                if (dstNode)
+                    delete dstNode;
+            }
         }
-        /*if (auto FS = Result.Nodes.getNodeAs<clang::Expr>("op_mul"))
-        {
-            FS->getType()->dump();
-            FS->dump();
-        }*/
     }
 };
 
@@ -234,10 +217,92 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
 }
 
-
-std::string treeToExressionDomainRdfString(ExpressionDomainNode* tree)
+vector<ExpressionDomainRdfNode> mapToExressionDomainRdfNodes(ExpressionDomainNode* node)
 {
+    vector<ExpressionDomainRdfNode> result;
+    int index = 0;
+    mapToExressionDomainRdfNodes(node, result, index);
+    if (result.size() > 0) 
+    {
+        result[0].setIsFirst();
+        result[result.size() - 1].setIsLast();
+    }
 
+    return result;
+}
+
+
+void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionDomainRdfNode>& acc, int& index)
+{
+    if (node == nullptr)
+        return;
+
+    if (auto tmp = dynamic_cast<ExpressionDomainUndefinedNode*>(node))
+    {
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainBinaryOperatorNode*>(node))
+    {
+        mapToExressionDomainRdfNodes(tmp->getLeftChild(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("operator", tmp->getType(), ++index));
+        mapToExressionDomainRdfNodes(tmp->getRightChild(), acc, index);        
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainUnaryOperatorNode*>(node))
+    {
+        if (tmp->isPostfix())
+        {
+            mapToExressionDomainRdfNodes(tmp->getChild(), acc, index);
+            acc.push_back(ExpressionDomainRdfNode("operator", tmp->getType(), ++index));
+        }
+        else
+        {
+            acc.push_back(ExpressionDomainRdfNode("operator", tmp->getType(), ++index));
+            mapToExressionDomainRdfNodes(tmp->getChild(), acc, index);
+        }        
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainVarNode*>(node))
+    {
+        acc.push_back(ExpressionDomainRdfNode("variable", tmp->getName(), ++index));
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainFuncCallNode*>(node))
+    {
+        acc.push_back(ExpressionDomainRdfNode("function", tmp->getName(), ++index));
+        acc.push_back(ExpressionDomainRdfNode("function_open_bracket", "(", ++index));        
+        int idx = 0;
+        for (auto * arg : tmp->getArgs())
+        {
+            mapToExressionDomainRdfNodes(arg, acc, index);
+            if (idx++ < tmp->getArgs().size() - 1)
+            {
+                acc.push_back(ExpressionDomainRdfNode("comma", ",", ++index));
+            }
+        }
+        acc.push_back(ExpressionDomainRdfNode("function_close_bracket", ")", ++index));
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainConstNode*>(node))
+    {
+        acc.push_back(ExpressionDomainRdfNode("const", tmp->getValue(), ++index));
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainMemberExprNode*>(node))
+    {
+        mapToExressionDomainRdfNodes(tmp->getLeftValue(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("operator", "->", ++index));
+        acc.push_back(ExpressionDomainRdfNode("variable", tmp->getRightValue(), ++index));
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainArrayBracketNode*>(node))
+    {
+        mapToExressionDomainRdfNodes(tmp->getArrayExpr(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("array_open_bracket", "[", ++index));
+        mapToExressionDomainRdfNodes(tmp->getIndexExpr(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("array_close_bracket", "]", ++index));
+        return;
+    }
 }
 
 int main(int argc, const char** argv) {
@@ -247,10 +312,12 @@ int main(int argc, const char** argv) {
         llvm::errs() << ExpectedParser.takeError();
         return 1;
     }
+    
 
     CommonOptionsParser& OptionsParser = ExpectedParser.get();
     ClangTool Tool(OptionsParser.getCompilations(),
         OptionsParser.getSourcePathList());
+
     /*
     auto matcher = expr(
         binaryOperator(anyOf(

@@ -18,8 +18,9 @@ public:
 
 	virtual void dump(int level = 0) = 0;
 
-	Stmt* getAstNode() { return this->astNode; };
+	virtual string toString() = 0;	
 
+	Stmt* getAstNode() { return this->astNode; };
 private:
 	Stmt* astNode;
 };
@@ -36,6 +37,11 @@ public:
 	void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Undefined" << "\n";
+	}
+
+	string toString()
+	{
+		return "<Undefinend node>";
 	}
 };
 
@@ -68,6 +74,13 @@ public:
 			this->rightChild->dump(level + 1);
 	}
 
+	string toString()
+	{
+		auto leftPart = this->leftChild ? this->leftChild->toString() : "<undefined>";
+		auto rightPart = this->rightChild ? this->rightChild->toString() : "<undefined>";
+		return leftPart + " " + this->type + " " + rightPart;
+	}
+
 private:
 	string type;
 	ExpressionDomainNode* leftChild;
@@ -95,6 +108,17 @@ public:
 		llvm::outs() << string(level, ' ') << "UnaryOperator" << " " << this->type << " " << "\n";
 		if (this->child)
 			this->child->dump(level + 1);
+	}
+
+	string toString()
+	{
+		auto isPostfix = ((clang::UnaryOperator*)this->getAstNode())->isPostfix();
+		return isPostfix ? this->child->toString() + this->type : this->type + this->child->toString();
+	}
+
+	bool isPostfix()
+	{
+		return ((clang::UnaryOperator*)this->getAstNode())->isPostfix();
 	}
 
 private:
@@ -126,6 +150,16 @@ public:
 			llvm::outs() << string(level, ' ') << "with initial value:" << "\n";
 			this->init->dump(level + 1);
 		}
+	}
+
+	string getName()
+	{
+		return this->name;
+	}
+
+	string toString()
+	{		
+		return this->name;
 	}
 
 private:
@@ -186,9 +220,30 @@ public:
 		}
 	}
 
+	string toString()
+	{
+		string argsString;
+		for (auto* arg : this->args)
+		{
+			if (arg)
+				argsString += ", " + arg->toString();
+		}
+		if (argsString.size() > 0)
+		{
+			argsString = argsString.substr(2);
+		}
+
+		return this->name + "(" + argsString + ")";
+	}
+
 	vector<ExpressionDomainNode*>& getArgs() 
 	{
 		return this->args;
+	}
+
+	string& getName()
+	{
+		return this->name;
 	}
 
 private:
@@ -209,6 +264,11 @@ public:
 	void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Const" << " " << this->value << " " << "\n";
+	}
+
+	string toString()
+	{
+		return this->value;
 	}
 
 private:
@@ -243,6 +303,18 @@ public:
 		return this->leftValue;
 	}
 
+	string& getRightValue()
+	{
+		return this->rightValue;
+	}
+
+	string toString()
+	{
+		auto leftPart = leftValue->toString();
+		// todo fix that
+		return leftPart + "->" + this->rightValue;
+	}
+
 private:
 	ExpressionDomainNode* leftValue;
 	string rightValue;
@@ -273,6 +345,14 @@ public:
 		llvm::outs() << string(level, ' ') << "index expr" << "\n";
 		if (this->indexExpr)
 			this->indexExpr->dump(level + 1);
+	}
+
+	string toString()
+	{
+		auto leftPart = this->arrayExpr->toString();
+		auto rightPart = this->indexExpr->toString();
+		// todo fix that
+		return leftPart + "[" + rightPart + "]";
 	}
 
 	ExpressionDomainNode* getArrayExpr() { return this->arrayExpr; }
