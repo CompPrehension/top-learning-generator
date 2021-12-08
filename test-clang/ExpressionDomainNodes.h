@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include "clang/ASTMatchers/ASTMatchers.h"
 
 using namespace std;
 using namespace clang;
@@ -7,9 +8,9 @@ using namespace clang;
 class ExpressionDomainNode
 {
 public:
-	ExpressionDomainNode(Stmt* astNode) 
+	ExpressionDomainNode(Stmt* astNode)
 		: astNode(astNode)
-	{
+	{		
 	}
 
 	virtual ~ExpressionDomainNode()
@@ -311,8 +312,14 @@ public:
 	string toString()
 	{
 		auto leftPart = leftValue->toString();
+		auto op = this->isArrow() ? "->" : ".";
 		// todo fix that
-		return leftPart + "->" + this->rightValue;
+		return leftPart + op + this->rightValue;
+	}
+
+	bool isArrow()
+	{
+		return ((MemberExpr*)this->getAstNode())->isArrow();
 	}
 
 private:

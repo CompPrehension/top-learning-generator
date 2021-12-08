@@ -120,7 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>Default</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -145,10 +145,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="expression-domain-functions.cpp" />
     <ClCompile Include="helpers.cpp" />
     <ClCompile Include="test-clang.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="expression-domain-functions.h" />
     <ClInclude Include="ExpressionDomainNodes.h" />
     <ClInclude Include="ExpressionDomainRdfNode.h" />
     <ClInclude Include="helpers.h" />
