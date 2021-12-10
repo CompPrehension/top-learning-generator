@@ -9,6 +9,8 @@
 #include <iostream>
 #include <fstream>
 #include "expression-domain-functions.h"
+#include "helpers.h"
+#include "cntrl-flow-domain-funtions.h"
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -33,6 +35,7 @@ public:
     virtual void run(const MatchFinder::MatchResult& Result) {
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
+            return;
             ExpressionDomainNode* dstNode;
             __try {
                 dstNode = mapToDst(node, Result.SourceManager);
@@ -42,6 +45,7 @@ public:
 
                 //std::cout << dstNode->toString();
                 //std::cout << "\n";
+                auto s = get_source_text_raw(node->getSourceRange(), *Result.SourceManager);
 
                 auto stringRepr = dstNode->toString();
                 auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
@@ -58,6 +62,21 @@ public:
                     delete dstNode;
             }
         }
+
+
+        if (auto node = Result.Nodes.getNodeAs<clang::FunctionDecl>("cntrlflowDomain"))
+        {
+            node->dump();
+
+            auto temp = mapToControlflowDst((clang::FunctionDecl*)node);
+
+            std::cout << "\n\n\n\n\n";
+
+            std::cout << toOriginalCppString(temp, *Result.SourceManager);
+
+            std::cout << "\n\n\n\n\n";
+        }
+
     }
 };
 
@@ -87,8 +106,7 @@ int main(int argc, const char** argv) {
     );
     */
 
-    auto matcher = expr(
-        //constantExpr(),
+    auto exressionDomainMatcher = expr(
         anyOf(
             binaryOperator(hasOperatorName("+")),
             binaryOperator(hasOperatorName("-")),
@@ -102,10 +120,14 @@ int main(int argc, const char** argv) {
             cxxMemberCallExpr()
         )
     ).bind("exressionDomain");
+    auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
+        .bind("cntrlflowDomain");
+
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    Finder.addMatcher(matcher, &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }

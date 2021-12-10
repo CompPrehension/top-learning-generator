@@ -34,5 +34,5 @@ std::string get_source_text(clang::SourceRange range, const clang::SourceManager
  * Use get_source_text() for that.
  */
 std::string get_source_text_raw(clang::SourceRange range, const clang::SourceManager& sm) {
-    return clang::Lexer::getSourceText(clang::CharSourceRange::getCharRange(range), sm, clang::LangOptions()).str();
+    return clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(range), sm, clang::LangOptions()).str();
 }

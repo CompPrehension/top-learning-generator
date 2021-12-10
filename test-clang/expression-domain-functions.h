@@ -4,6 +4,7 @@
 #include <vector>
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include <clang/Lex/Lexer.h>
 
 using namespace std;
 using namespace clang;

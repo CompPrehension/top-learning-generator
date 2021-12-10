@@ -19,6 +19,12 @@
     <Filter Include="Исходные файлы\expression-domain">
       <UniqueIdentifier>{75175a27-07f7-44fb-bd7d-1ad9199076ff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Файлы заголовков\cntrl-flow-domain">
+      <UniqueIdentifier>{1cb5154d-647d-4552-a529-5ca903d58417}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\cntrl-flow-domain">
+      <UniqueIdentifier>{eaf9db95-f116-4411-aa3e-092aedb7db78}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test-clang.cpp">
@@ -29,6 +35,9 @@
     </ClCompile>
     <ClCompile Include="expression-domain-functions.cpp">
       <Filter>Исходные файлы\expression-domain</Filter>
+    </ClCompile>
+    <ClCompile Include="cntrl-flow-domain-funtions.cpp">
+      <Filter>Исходные файлы\cntrl-flow-domain</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -43,6 +52,12 @@
     </ClInclude>
     <ClInclude Include="expression-domain-functions.h">
       <Filter>Файлы заголовков\expresson-domain</Filter>
+    </ClInclude>
+    <ClInclude Include="ControlFlowDomainNodes.h">
+      <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
+    </ClInclude>
+    <ClInclude Include="cntrl-flow-domain-funtions.h">
+      <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

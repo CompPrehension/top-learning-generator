@@ -145,11 +145,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cntrl-flow-domain-funtions.cpp" />
     <ClCompile Include="expression-domain-functions.cpp" />
     <ClCompile Include="helpers.cpp" />
     <ClCompile Include="test-clang.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cntrl-flow-domain-funtions.h" />
+    <ClInclude Include="ControlFlowDomainNodes.h" />
     <ClInclude Include="expression-domain-functions.h" />
     <ClInclude Include="ExpressionDomainNodes.h" />
     <ClInclude Include="ExpressionDomainRdfNode.h" />

@@ -157,7 +157,8 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
 
     }
     */
-
+    //auto sourceRange = node->getSourceRange();
+    const string text = Lexer::getSourceText(clang::CharSourceRange::getTokenRange(node->getSourceRange()), *sourceMgr, clang::LangOptions()).str();
     auto undefinedsource = get_source_text_raw(node->getSourceRange(), *sourceMgr);
     return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
 }
