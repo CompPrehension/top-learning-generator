@@ -1,6 +1,12 @@
 #pragma once
 #include <string>
 #include <clang/Basic/SourceLocation.h>
+#include <string>
+#include <sstream>
+#include <regex>
+
+using std::string;
+using std::stringstream;
 
 /**
  * Gets the portion of the code that corresponds to given SourceRange, including the
@@ -25,3 +31,14 @@ std::string get_source_text(clang::SourceRange range, const clang::SourceManager
  * Use get_source_text() for that.
  */
 std::string get_source_text_raw(clang::SourceRange range, const clang::SourceManager& sm);
+
+std::string get_source_text_raw_tr(clang::SourceRange range, const clang::SourceManager& sm);
+
+
+
+
+string stringReplace(const string& source, const string& toReplace, const string& replaceWith);
+
+string removeNewLines(const string& source);
+
+string removeMultipleSpaces(const string& source);

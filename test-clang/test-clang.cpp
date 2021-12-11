@@ -75,8 +75,14 @@ public:
             std::cout << toOriginalCppString(temp, *Result.SourceManager);
 
             std::cout << "\n\n\n\n\n";
-        }
 
+            std::cout << toCustomCppString(temp, *Result.SourceManager, true);
+
+            std::cout << "\n\n\n\n\n";
+
+            // _CRT_MEMCPY_S_VALIDATE_RETURN_ERRCODE
+            
+        }
     }
 };
 
@@ -127,7 +133,7 @@ int main(int argc, const char** argv) {
     ExprPrinter Printer;
     MatchFinder Finder;
     Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), & Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }

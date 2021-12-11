@@ -34,5 +34,50 @@ std::string get_source_text(clang::SourceRange range, const clang::SourceManager
  * Use get_source_text() for that.
  */
 std::string get_source_text_raw(clang::SourceRange range, const clang::SourceManager& sm) {
+    return clang::Lexer::getSourceText(clang::CharSourceRange::getCharRange(range), sm, clang::LangOptions()).str();
+}
+
+std::string get_source_text_raw_tr(clang::SourceRange range, const clang::SourceManager& sm) {
     return clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(range), sm, clang::LangOptions()).str();
+}
+
+string stringReplace(const string& source, const string& toReplace, const string& replaceWith)
+{
+    size_t pos = 0;
+    size_t cursor = 0;
+    int repLen = toReplace.length();
+    stringstream builder;
+
+    do
+    {
+        pos = source.find(toReplace, cursor);
+
+        if (string::npos != pos)
+        {
+            //copy up to the match, then append the replacement
+            builder << source.substr(cursor, pos - cursor);
+            builder << replaceWith;
+
+            // skip past the match 
+            cursor = pos + repLen;
+        }
+    } while (string::npos != pos);
+
+    //copy the remainder
+    builder << source.substr(cursor);
+
+    return (builder.str());
+}
+
+string removeNewLines(const string& source)
+{
+    return stringReplace(stringReplace(source, "\n", ""), "\r", "");
+}
+
+std::regex re("\\s{2,}");
+string removeMultipleSpaces(const string& source)
+{
+    stringstream builder;
+    std::regex_replace(std::ostreambuf_iterator<char>(builder), source.begin(), source.end(), re, " ");
+    return builder.str();
 }

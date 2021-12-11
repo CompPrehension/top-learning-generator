@@ -28,19 +28,6 @@ private:
 	Stmt* astNode;
 };
 
-/*
-class ControlFlowDomainDeclNode : public ControlFlowDomainNode
-{
-public:
-	ControlFlowDomainDeclNode(Decl* astNode)
-		: astNode(astNode)
-	{
-	}
-	Decl* getAstNode() { return this->astNode; };
-private:
-	Decl* astNode;
-};
-*/
 
 
 class ControlFlowDomainUndefinedStmtNode : public ControlFlowDomainStmtNode
@@ -67,6 +54,8 @@ public:
 				delete stmt;
 		}
 	}
+
+	vector<ControlFlowDomainStmtNode*>& getChilds() { return this->stmts; }
 
 private:
 	vector<ControlFlowDomainStmtNode*> stmts;
