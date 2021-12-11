@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include "ControlFlowDomainNodes.h"
+#include "ControlFlowDomainRdfNodes.h"
 #include "helpers.h"
 
 using namespace std;
@@ -12,3 +13,5 @@ ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl);
 
 std::string toOriginalCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr);
 std::string toCustomCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr, bool isDebug = false);
+
+ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr);

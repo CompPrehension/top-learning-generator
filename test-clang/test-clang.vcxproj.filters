@@ -59,5 +59,8 @@
     <ClInclude Include="cntrl-flow-domain-funtions.h">
       <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
     </ClInclude>
+    <ClInclude Include="ControlFlowDomainRdfNodes.h">
+      <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -166,15 +166,6 @@ private:
 	ControlFlowDomainExprStmtNode* expr;
 };
 
-class ControlFlowDomainForStmtNode : public ControlFlowDomainStmtNode
-{
-public:
-	ControlFlowDomainForStmtNode(ForStmt* astNode)
-		: ControlFlowDomainStmtNode(astNode)
-	{
-	}
-};
-
 class ControlFlowDomainFuncDeclNode
 {
 public:

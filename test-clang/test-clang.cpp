@@ -78,6 +78,8 @@ public:
 
             std::cout << toCustomCppString(temp, *Result.SourceManager, true);
 
+            auto teee = mapToRdfNode(temp, *Result.SourceManager);
+
             std::cout << "\n\n\n\n\n";
 
             // _CRT_MEMCPY_S_VALIDATE_RETURN_ERRCODE
