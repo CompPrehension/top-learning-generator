@@ -44,10 +44,14 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto ifStmt = dyn_cast<clang::IfStmt>(stmt))
 	{
-		auto expr = mapExprToControlflowDst(ifStmt->getCond());
-		auto then = mapToControlflowDst(ifStmt->getThen());
-		auto _else = mapToControlflowDst(ifStmt->getElse());
-		return new ControlFlowDomainIfStmtNode(ifStmt, expr, then, _else);
+		auto currentIf = ifStmt;
+		vector<ControlFlowDomainIfStmtPart*> ifParts;
+		do
+		{
+			ifParts.push_back(new ControlFlowDomainIfStmtPart(currentIf, mapExprToControlflowDst(currentIf->getCond()), mapToControlflowDst(currentIf->getThen())));
+		} while (currentIf->getElse() && isa<clang::IfStmt>(currentIf->getElse()) && (currentIf = dyn_cast<clang::IfStmt>(currentIf->getElse())));
+		auto _else = mapToControlflowDst(currentIf->getElse());
+		return new ControlFlowDomainIfStmtNode(ifParts, _else);
 	}
 	if (auto whileStmt = dyn_cast<clang::WhileStmt>(stmt))
 	{
@@ -151,24 +155,31 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 	}
 	if (auto node = dynamic_cast<ControlFlowDomainIfStmtNode*>(stmt))
 	{
-		if (!ignoreFirstLineSpaces)
-			printTabs(ss, recursionLevel);
-		ss << "if (";
-		printExpr(ss, node->getExpr(), mgr);
-		ss << ")\n";
-		toCustomCppStringInner(ss, node->getThenBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getThenBody()) ? recursionLevel : recursionLevel + 1);
-		if (node->getElseBody() && node->getElseBody()->getAstNode())
+		auto ifParts = node->getIfParts();
+		for (int i = 0; i < ifParts.size(); ++i)
 		{
-			if (dynamic_cast<ControlFlowDomainIfStmtNode*>(node->getElseBody()))
+			if (i == 0)
 			{
-				printTabs(ss, recursionLevel) << "else ";
-				toCustomCppStringInner(ss, node->getElseBody(), mgr, isDebug, recursionLevel, true);
+				if (!ignoreFirstLineSpaces)
+					printTabs(ss, recursionLevel);
+
+				ss << "if (";
+				printExpr(ss, ifParts[i]->getExpr(), mgr);
+				ss << ")\n";
 			}
-			else
+			else 
 			{
-				printTabs(ss, recursionLevel) << "else\n";
-				toCustomCppStringInner(ss, node->getElseBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getElseBody()) ? recursionLevel : recursionLevel + 1);
+				printTabs(ss, recursionLevel);
+				ss << "else if (";
+				printExpr(ss, ifParts[i]->getExpr(), mgr);
+				ss << ")\n";
 			}
+			toCustomCppStringInner(ss, ifParts[i]->getThenBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(ifParts[i]->getThenBody()) ? recursionLevel : recursionLevel + 1);
+		}
+		if (node->getElseBody() && node->getElseBody()->getAstNode())
+		{			
+			printTabs(ss, recursionLevel) << "else\n";
+			toCustomCppStringInner(ss, node->getElseBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getElseBody()) ? recursionLevel : recursionLevel + 1);
 		}
 		return;
 	}
@@ -342,8 +353,41 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 
 	if (auto castedNode = dynamic_cast<ControlFlowDomainIfStmtNode*>(node))
 	{
-		//TODO
-		return NULL;
+		vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives;
+		ControlFlowDomainAlternativeBranchRdfNode* prevBranchNode = NULL;
+		auto ifParts = castedNode->getIfParts();
+		for (int i = 0; i < ifParts.size(); ++i)
+		{
+			auto seq = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(ifParts[i]->getThenBody(), idGenerator, mgr, true);
+			auto expr = mapToRdfNode(ifParts[i]->getExpr(), idGenerator, mgr);
+			ControlFlowDomainAlternativeBranchRdfNode* branchNode = (i == 0)
+				? (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()))
+				: (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeElseIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()));
+			if (prevBranchNode)
+			{
+				prevBranchNode->setNext(branchNode);
+			}
+			alternatives.push_back(branchNode);
+			seq->setBody(vector<ControlFlowDomainLinkedRdfNode*>());
+			delete seq;
+			prevBranchNode = branchNode;
+		}
+		if (castedNode->getElseBody() && castedNode->getElseBody()->getAstNode())
+		{
+			auto seq = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getElseBody(), idGenerator, mgr, true);
+			auto branchNode = new ControlFlowDomainAlternativeElseBranchRdfNode(++idGenerator, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()));
+			prevBranchNode->setNext(branchNode);
+			alternatives.push_back(branchNode);
+			seq->setBody(vector<ControlFlowDomainLinkedRdfNode*>());
+			delete seq;
+		}
+		if (alternatives.size() > 0)
+		{
+			alternatives[0]->setFirst();
+			alternatives[alternatives.size() - 1]->setLast();
+		}
+
+		return new ControlFlowDomainAlternativeRdfNode(++idGenerator, alternatives);
 	}
 
 	if (auto castedNode = dynamic_cast<ControlFlowDomainWhileStmtNode*>(node))

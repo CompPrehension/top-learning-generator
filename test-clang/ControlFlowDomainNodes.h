@@ -72,31 +72,56 @@ public:
 };
 
 
-class ControlFlowDomainIfStmtNode : public ControlFlowDomainStmtNode
+class ControlFlowDomainIfStmtPart
 {
 public:
-	ControlFlowDomainIfStmtNode(IfStmt* astNode, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* thenBody, ControlFlowDomainStmtNode* elseBody)
-		: ControlFlowDomainStmtNode(astNode), expr(expr), thenBody(thenBody), elseBody(elseBody)
+	ControlFlowDomainIfStmtPart(IfStmt* astNode, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* thenBody)
+		: astNode(astNode), expr(expr), thenBody(thenBody)
 	{
 	}
-	~ControlFlowDomainIfStmtNode()
+	~ControlFlowDomainIfStmtPart()
 	{
 		if (this->expr)
 			delete this->expr;
 		if (this->thenBody)
 			delete this->thenBody;
+	}
+
+	IfStmt* getAstNode() { return this->astNode; }
+	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
+	ControlFlowDomainStmtNode* getThenBody() { return this->thenBody; }
+
+private:
+	IfStmt* astNode;
+	ControlFlowDomainExprStmtNode* expr;
+	ControlFlowDomainStmtNode* thenBody;
+};
+
+
+class ControlFlowDomainIfStmtNode : public ControlFlowDomainStmtNode
+{
+public:
+	ControlFlowDomainIfStmtNode(vector<ControlFlowDomainIfStmtPart*> ifParts, ControlFlowDomainStmtNode* elseBody)
+		: ControlFlowDomainStmtNode(ifParts[0]->getAstNode()), ifParts(ifParts), elseBody(elseBody)
+	{
+	}
+	~ControlFlowDomainIfStmtNode()
+	{
+		for (auto part : this->ifParts)
+		{
+			if (part)
+				delete part;
+		}
 		if (this->elseBody)
 			delete this->elseBody;
 	}
 
-
-	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
-	ControlFlowDomainStmtNode* getThenBody() { return this->thenBody; }
+	ControlFlowDomainExprStmtNode* getOriginalExpr() { return this->ifParts[0]->getExpr(); }
+	vector<ControlFlowDomainIfStmtPart*>& getIfParts() { return this->ifParts; }
 	ControlFlowDomainStmtNode* getElseBody() { return this->elseBody; }
 
 private:
-	ControlFlowDomainExprStmtNode* expr;
-	ControlFlowDomainStmtNode* thenBody;
+	vector<ControlFlowDomainIfStmtPart*> ifParts;
 	ControlFlowDomainStmtNode* elseBody;
 };
 

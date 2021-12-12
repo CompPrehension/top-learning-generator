@@ -99,6 +99,10 @@ public:
 	{
 		return this->body;
 	}
+	void setBody(vector<ControlFlowDomainLinkedRdfNode*> body)
+	{
+		this->body = body;
+	}
 
 private:
 	vector<ControlFlowDomainLinkedRdfNode*> body;
