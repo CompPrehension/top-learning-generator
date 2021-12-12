@@ -14,4 +14,4 @@ ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl);
 std::string toOriginalCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr);
 std::string toCustomCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr, bool isDebug = false);
 
-ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr);
+ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(string algUniqueName, ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr);

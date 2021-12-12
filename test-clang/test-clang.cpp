@@ -11,6 +11,7 @@
 #include "expression-domain-functions.h"
 #include "helpers.h"
 #include "cntrl-flow-domain-funtions.h"
+#include <ctime>
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -69,32 +70,47 @@ public:
             ControlFlowDomainFuncDeclNode* dstNode = NULL;
             ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
             __try {
-                node->dump();
+                //node->dump();
 
                 dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
+                if (!dstNode)
+                    return;
+
+                auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
+                auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
                 
+                std::cout << "\n\n\n\n\n";                
+                std::cout << originalCode;
+                std::cout << "\n\n\n\n\n";
+                std::cout << normalizedCode;
                 std::cout << "\n\n\n\n\n";
 
-                std::cout << toOriginalCppString(dstNode, *Result.SourceManager);
 
-                std::cout << "\n\n\n\n\n";
+                auto time = std::time(0);
+                auto algoName = to_string(++counter) + string("__") + dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(time);
+                rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
+                auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
 
-                std::cout << toCustomCppString(dstNode, *Result.SourceManager, true);
 
-                std::cout << "\n\n\n\n\n";
+                std::cout << rdfString;
 
-                rdfNode = mapToRdfNode(dstNode, *Result.SourceManager);
-
-                auto stringRepr = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
-
-                std::cout << stringRepr;
-
+                
+                string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\" + algoName + ".rdf";
+                std::ofstream file(filename);
+                file << "# Original function\n";
+                file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
+                file << "\n\n";
+                file << "# Normalized function\n";
+                file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
+                file << "\n\n";
+                file << "# rdf:\n\n";
+                file << rdfString;
             } __finally {
                 if (dstNode)
                     delete dstNode;
                 if (rdfNode)
                     delete rdfNode;
-            }            
+            }
         }
     }
 };
@@ -113,17 +129,6 @@ int main(int argc, const char** argv) {
     CommonOptionsParser& OptionsParser = ExpectedParser.get();
     ClangTool Tool(OptionsParser.getCompilations(),
         OptionsParser.getSourcePathList());
-
-    /*
-    auto matcher = expr(
-        binaryOperator(anyOf(
-            hasOperatorName("+"),
-            //hasOperatorName("-"),
-            //hasOperatorName("*"),
-            hasOperatorName("/")
-        )).bind("match")
-    );
-    */
 
     auto exressionDomainMatcher = expr(
         anyOf(

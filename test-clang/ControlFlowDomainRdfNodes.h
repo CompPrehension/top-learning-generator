@@ -129,7 +129,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":sequence ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body_item " << this->getBody()[0]->getNodeRef() << " \n";
@@ -243,7 +243,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
@@ -282,7 +282,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":do_while_loop ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
@@ -328,7 +328,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":while_loop ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
@@ -383,7 +383,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
 		if (this->isLast())
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
-		ss << string(attributesOffest + 4, ' ') << ":linked_list ;\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":alternative ;\n";
 		
 		
@@ -394,7 +394,7 @@ public:
 			ss << ((i != this->alternatives.size() - 1) ? " \n" : " ;\n");
 		}
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
@@ -444,7 +444,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":if ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
@@ -502,7 +502,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":else-if ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
@@ -560,7 +560,7 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":else ;\n";
 		if (this->getNext())
-			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";

@@ -11,7 +11,7 @@ ControlFlowDomainExprStmtNode* mapExprToControlflowDst(Expr* expr)
 
 ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl)
 {
-	if (funcDecl == nullptr)
+	if (funcDecl == nullptr || !funcDecl->getBody() || (isa<clang::CompoundStmt>(funcDecl->getBody()) && dyn_cast<clang::CompoundStmt>(funcDecl->getBody())->body().empty()))
 		return nullptr;
 
 	auto body = mapToControlflowDst(funcDecl->getBody());
@@ -44,6 +44,12 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto ifStmt = dyn_cast<clang::IfStmt>(stmt))
 	{
+		if (ifStmt->getThen() && isa<clang::CompoundStmt>(ifStmt->getThen()) && dyn_cast<clang::CompoundStmt>(ifStmt->getThen())->body().empty() ||
+			ifStmt->getElse() && isa<clang::CompoundStmt>(ifStmt->getElse()) && dyn_cast<clang::CompoundStmt>(ifStmt->getElse())->body().empty())
+		{
+			return new ControlFlowDomainUndefinedStmtNode(stmt);
+		}
+
 		auto currentIf = ifStmt;
 		vector<ControlFlowDomainIfStmtPart*> ifParts;
 		do
@@ -55,12 +61,22 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto whileStmt = dyn_cast<clang::WhileStmt>(stmt))
 	{
+		if (!whileStmt->getBody() || isa<clang::CompoundStmt>(whileStmt->getBody()) && dyn_cast<clang::CompoundStmt>(whileStmt->getBody())->body().empty())
+		{
+			return new ControlFlowDomainUndefinedStmtNode(stmt);
+		}
+
 		auto expr = mapExprToControlflowDst(whileStmt->getCond());
 		auto body = mapToControlflowDst(whileStmt->getBody());
 		return new ControlFlowDomainWhileStmtNode(whileStmt, expr, body);
 	}
 	if (auto doStmt = dyn_cast<clang::DoStmt>(stmt))
 	{
+		if (!doStmt->getBody() || isa<clang::CompoundStmt>(doStmt->getBody()) && dyn_cast<clang::CompoundStmt>(doStmt->getBody())->body().empty())
+		{
+			return new ControlFlowDomainUndefinedStmtNode(stmt);
+		}
+
 		auto expr = mapExprToControlflowDst(doStmt->getCond());
 		auto body = mapToControlflowDst(doStmt->getBody());
 		return new ControlFlowDomainDoWhileStmtNode(doStmt, expr, body);
@@ -252,62 +268,31 @@ ControlFlowDomainExprRdfNode* mapToRdfNode(ControlFlowDomainExprStmtNode* node, 
 	return new ControlFlowDomainExprRdfNode(++idGenerator, getAstRawString(node->getAstNode(), mgr));
 }
 
-/*
-ControlFlowDomainSequenceRdfNode* mapToRdfNodeToSeq(ControlFlowDomainStmtNode* node, int& idGenerator, clang::SourceManager& mgr)
-{
-	if (auto castedNode = dynamic_cast<ControlFlowDomainStmtListNode*>(node))
-	{
-		vector<ControlFlowDomainLinkedRdfNode*> body;
-		ControlFlowDomainLinkedRdfNode* prev = NULL;
-		for (auto child : castedNode->getChilds())
-		{
-			auto current = mapToRdfNode(child, idGenerator, mgr);
-			if (prev)
-			{
-				prev->setNext(current);
-			}
-			body.push_back(current);
-			prev = current;
-		}
-		if (body.size() > 0)
-		{
-			body[0]->setFirst();
-			body[body.size() - 1]->setLast();
-		}
-
-		return new ControlFlowDomainSequenceRdfNode(++id)
-	}
-	if (auto castedNode = dynamic_cast<ControlFlowDomainStmtNode*>(node))
-	{
-		vector<ControlFlowDomainLinkedRdfNode*> body;
-		ControlFlowDomainLinkedRdfNode* prev = NULL;
-		for (auto child : castedNode->getChilds())
-		{
-			auto current = mapToRdfNode(child, idGenerator, mgr);
-			if (prev)
-			{
-				prev->setNext(current);
-			}
-			body.push_back(current);
-			prev = current;
-		}
-		if (body.size() > 0)
-		{
-			body[0]->setFirst();
-			body[body.size() - 1]->setLast();
-		}
-
-		return new ControlFlowDomainSequenceRdfNode(++id)
-	}
-}
-
-*/
 
 ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, int& idGenerator, clang::SourceManager& mgr, bool forceToSeq = false)
 {	
-	if (node == NULL || dynamic_cast<ControlFlowDomainUndefinedStmtNode*>(node))
+	if (node == NULL)
 	{
 		return NULL;
+	}
+
+	if (auto castedNode = dynamic_cast<ControlFlowDomainUndefinedStmtNode*>(node))
+	{
+		// TODO validate that
+		auto val = new ControlFlowDomainStmtRdfNode(++idGenerator, "int tempUndefinedStmtReplacer" + to_string(idGenerator) + " = 0;");
+		if (forceToSeq)
+		{
+			vector<ControlFlowDomainLinkedRdfNode*> body;
+			body.push_back(val);
+			val->setFirst();
+			val->setLast();
+			val->setIndex(0);
+			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
+		}
+		else
+		{
+			return val;
+		}
 	}
 
 	if (auto castedNode = dynamic_cast<ControlFlowDomainStmtListNode*>(node))
@@ -360,9 +345,13 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 		vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives;
 		ControlFlowDomainAlternativeBranchRdfNode* prevBranchNode = NULL;
 		auto ifParts = castedNode->getIfParts();
-		for (int i = 0; i < ifParts.size(); ++i)
+		int i = 0;
+		for (i = 0; i < ifParts.size(); ++i)
 		{
 			auto seq = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(ifParts[i]->getThenBody(), idGenerator, mgr, true);
+			if (!seq)
+				return NULL;
+
 			auto expr = mapToRdfNode(ifParts[i]->getExpr(), idGenerator, mgr);
 			ControlFlowDomainAlternativeBranchRdfNode* branchNode = (i == 0)
 				? (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()))
@@ -382,6 +371,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			auto seq = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getElseBody(), idGenerator, mgr, true);
 			auto branchNode = new ControlFlowDomainAlternativeElseBranchRdfNode(++idGenerator, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()));
 			prevBranchNode->setNext(branchNode);
+			branchNode->setIndex(i);
 			alternatives.push_back(branchNode);
 			seq->setBody(vector<ControlFlowDomainLinkedRdfNode*>());
 			delete seq;
@@ -448,10 +438,10 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 
 
 
-ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr)
+ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(string algUniqueName, ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr)
 {
 	int id = 0;
 	auto funcBody = mapToRdfNode(node->getBody(), id, mgr, true);
-	return new ControlFlowDomainAlgorythmRdfNode("testAlgo", ++id, (ControlFlowDomainSequenceRdfNode*)funcBody);
+	return new ControlFlowDomainAlgorythmRdfNode(algUniqueName, ++id, (ControlFlowDomainSequenceRdfNode*)funcBody);
 }
 
