@@ -42,3 +42,5 @@ string stringReplace(const string& source, const string& toReplace, const string
 string removeNewLines(const string& source);
 
 string removeMultipleSpaces(const string& source);
+
+std::string xmlEncode(std::string& data);

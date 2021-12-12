@@ -314,7 +314,9 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 	{
 		vector<ControlFlowDomainLinkedRdfNode*> body;
 		ControlFlowDomainLinkedRdfNode* prev = NULL;
-		for (auto child : castedNode->getChilds())
+		auto stmts = castedNode->getChilds();
+		ControlFlowDomainStmtNode* child;
+		for (int i = 0; (i < stmts.size()) && (child = stmts[i]); ++i)
 		{
 			auto current = mapToRdfNode(child, idGenerator, mgr);
 			if (!current)
@@ -323,6 +325,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			{
 				prev->setNext(current);
 			}
+			current->setIndex(i);
 			body.push_back(current);
 			prev = current;
 		}
@@ -343,6 +346,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			body.push_back(val);
 			val->setFirst();
 			val->setLast();
+			val->setIndex(0);
 			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
 		}		
 		else
@@ -367,6 +371,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			{
 				prevBranchNode->setNext(branchNode);
 			}
+			branchNode->setIndex(i);
 			alternatives.push_back(branchNode);
 			seq->setBody(vector<ControlFlowDomainLinkedRdfNode*>());
 			delete seq;
@@ -411,6 +416,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			body.push_back(val);
 			val->setFirst();
 			val->setLast();
+			val->setIndex(0);
 			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
 		}
 		else
@@ -427,6 +433,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			body.push_back(val);
 			val->setFirst();
 			val->setLast();
+			val->setIndex(0);
 			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
 		}
 		else

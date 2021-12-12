@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <iostream>
+#include "helpers.h"
 
 using namespace std;
 
@@ -17,10 +19,14 @@ public:
 	{
 	}
 
-	virtual void toString(stringstream& ss)
+	string toString()
 	{
-
+		stringstream ss;
+		this->toString(ss);
+		return ss.str();
 	}
+
+	virtual void toString(stringstream& ss) = 0;
 
 	string getNodeName()
 	{
@@ -51,6 +57,7 @@ public:
 		next = NULL;
 		_isFirst = false;
 		_isLast = false;
+		index = -1;
 	}
 
 	~ControlFlowDomainLinkedRdfNode()
@@ -71,9 +78,13 @@ public:
 	bool isLast() { return _isLast; }
 	void setLast() { _isLast = true; }
 
+	int getIndex() { return index; }
+	void setIndex(int idx) { index = idx; }
+
 private:
 	bool _isFirst;
 	bool _isLast;
+	int index;
 	ControlFlowDomainLinkedRdfNode* next;
 };
 
@@ -104,6 +115,38 @@ public:
 		this->body = body;
 	}
 
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":sequence ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->getBody()[0]->getNodeRef() << " \n";
+		for (int i = 1; i < this->getBody().size(); ++i)
+		{
+			ss << string(attributesOffest + 11, ' ') << this->getBody()[i]->getNodeRef();
+			ss << ((i != this->getBody().size() - 1) ? " \n" : " ;\n");
+		}
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		for (auto ch : this->getBody())
+		{
+			ch->toString(ss);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainLinkedRdfNode*> body;
 };
@@ -128,6 +171,23 @@ public:
 		return this->sequence;
 	}
 
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":algorithm ;\n";
+		ss << string(attributesOffest, ' ') << ":entry_point " << this->getSequence()->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":global_code " << this->getSequence()->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":algorithm_name \"" << xmlEncode(this->algorithmName) << "\"^^xsd:string; \n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		this->getSequence()->toString(ss);
+	}
+
 private:
 	string algorithmName;
 	ControlFlowDomainSequenceRdfNode* sequence;
@@ -140,6 +200,18 @@ public:
 	ControlFlowDomainExprRdfNode(int id, string text)
 		: ControlFlowDomainRdfNode("expr", id), text(text)
 	{
+	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":expr ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << xmlEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
 private:
@@ -157,6 +229,27 @@ public:
 		: ControlFlowDomainLinkedRdfNode("stmt", id), text(text)
 	{
 	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << xmlEncode(this->text) << "\"^^xsd:string .\n";
+	}
+
 private:
 	string text;
 };
@@ -174,6 +267,31 @@ public:
 			delete this->expr;
 		if (this->body)
 			delete this->body;
+	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":do_while_loop ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		this->expr->toString(ss);
+		this->body->toString(ss);
 	}
 
 private:
@@ -195,6 +313,31 @@ public:
 			delete this->expr;
 		if (this->body)
 			delete this->body;
+	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":while_loop ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		this->expr->toString(ss);
+		this->body->toString(ss);
 	}
 
 private:
@@ -229,6 +372,40 @@ public:
 		}
 	}
 
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ;\n";
+		ss << string(attributesOffest + 4, ' ') << ":alternative ;\n";
+		
+		
+		ss << string(attributesOffest, ' ') << ":branches_item " << this->alternatives[0]->getNodeRef() << " \n";
+		for (int i = 1; i < this->alternatives.size(); ++i)
+		{
+			ss << string(attributesOffest + 15, ' ') << this->alternatives[i]->getNodeRef();
+			ss << ((i != this->alternatives.size() - 1) ? " \n" : " ;\n");
+		}
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		for (auto br : alternatives)
+		{
+			br->toString(ss);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives;
 };
@@ -252,6 +429,41 @@ public:
 				delete c;
 		}
 	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":if ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		for (int i = 1; i < this->body.size(); ++i)
+		{
+			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
+			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+		}
+		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		expr->toString(ss);
+		for (auto ch : this->body)
+		{
+			ch->toString(ss);
+		}
+	}
+
 private:
 	ControlFlowDomainExprRdfNode* expr;
 	vector<ControlFlowDomainLinkedRdfNode*> body;
@@ -275,6 +487,42 @@ public:
 				delete c;
 		}
 	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":else-if ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		for (int i = 1; i < this->body.size(); ++i)
+		{
+			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
+			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+		}
+		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		expr->toString(ss);
+		for (auto ch : this->body)
+		{
+			ch->toString(ss);
+		}
+	}
+
+
 private:
 	ControlFlowDomainExprRdfNode* expr;
 	vector<ControlFlowDomainLinkedRdfNode*> body;
@@ -297,6 +545,39 @@ public:
 				delete c;
 		}
 	}
+
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":linked_list ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		ss << string(attributesOffest + 4, ' ') << ":else ;\n";
+		if (this->getNext())
+			ss << string(attributesOffest + 4, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		for (int i = 1; i < this->body.size(); ++i)
+		{
+			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
+			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+		}
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
+
+		for (auto ch : this->body)
+		{
+			ch->toString(ss);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainLinkedRdfNode*> body;
 };

@@ -36,7 +36,7 @@ public:
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
             return;
-            ExpressionDomainNode* dstNode;
+            ExpressionDomainNode* dstNode = NULL;
             __try {
                 dstNode = mapToDst(node, Result.SourceManager);
 
@@ -66,24 +66,35 @@ public:
 
         if (auto node = Result.Nodes.getNodeAs<clang::FunctionDecl>("cntrlflowDomain"))
         {
-            node->dump();
+            ControlFlowDomainFuncDeclNode* dstNode = NULL;
+            ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
+            __try {
+                node->dump();
 
-            auto temp = mapToControlflowDst((clang::FunctionDecl*)node);
+                dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
+                
+                std::cout << "\n\n\n\n\n";
 
-            std::cout << "\n\n\n\n\n";
+                std::cout << toOriginalCppString(dstNode, *Result.SourceManager);
 
-            std::cout << toOriginalCppString(temp, *Result.SourceManager);
+                std::cout << "\n\n\n\n\n";
 
-            std::cout << "\n\n\n\n\n";
+                std::cout << toCustomCppString(dstNode, *Result.SourceManager, true);
 
-            std::cout << toCustomCppString(temp, *Result.SourceManager, true);
+                std::cout << "\n\n\n\n\n";
 
-            auto teee = mapToRdfNode(temp, *Result.SourceManager);
+                rdfNode = mapToRdfNode(dstNode, *Result.SourceManager);
 
-            std::cout << "\n\n\n\n\n";
+                auto stringRepr = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
 
-            // _CRT_MEMCPY_S_VALIDATE_RETURN_ERRCODE
-            
+                std::cout << stringRepr;
+
+            } __finally {
+                if (dstNode)
+                    delete dstNode;
+                if (rdfNode)
+                    delete rdfNode;
+            }            
         }
     }
 };

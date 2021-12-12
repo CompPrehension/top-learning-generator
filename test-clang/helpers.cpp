@@ -81,3 +81,18 @@ string removeMultipleSpaces(const string& source)
     std::regex_replace(std::ostreambuf_iterator<char>(builder), source.begin(), source.end(), re, " ");
     return builder.str();
 }
+
+std::string xmlEncode(std::string& data) {
+    std::string buffer;
+    for (size_t pos = 0; pos != data.size(); ++pos) {
+        switch (data[pos]) {
+        case '&':  buffer.append("&amp;");       break;
+        case '\"': buffer.append("&quot;");      break;
+        case '\'': buffer.append("&apos;");      break;
+        case '<':  buffer.append("&lt;");        break;
+        case '>':  buffer.append("&gt;");        break;
+        default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    return buffer;
+}
