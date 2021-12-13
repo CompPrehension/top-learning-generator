@@ -82,16 +82,27 @@ string removeMultipleSpaces(const string& source)
     return builder.str();
 }
 
-std::string xmlEncode(std::string& data) {
+std::string turtleStringEncode(std::string& data) {
     std::string buffer;
     for (size_t pos = 0; pos != data.size(); ++pos) {
         switch (data[pos]) {
-        case '&':  buffer.append("&amp;");       break;
-        case '\"': buffer.append("&quot;");      break;
-        case '\'': buffer.append("&apos;");      break;
-        case '<':  buffer.append("&lt;");        break;
-        case '>':  buffer.append("&gt;");        break;
-        default:   buffer.append(&data[pos], 1); break;
+        case '\t': 
+            buffer.append("\\t"); break;
+        case '\b':
+            buffer.append("\\b"); break;
+        case '\n':
+            buffer.append("\\n"); break;
+        case '\r':
+            buffer.append("\\r"); break;
+        case '\f':
+            buffer.append("\\f"); break;
+        case '\"':
+        case '\'':
+        case '\\':
+            buffer.append("\\");
+            // correct break stmt missing;
+        default:   
+            buffer.append(&data[pos], 1); break;
         }
     }
     return buffer;

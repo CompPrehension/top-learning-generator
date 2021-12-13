@@ -43,4 +43,4 @@ string removeNewLines(const string& source);
 
 string removeMultipleSpaces(const string& source);
 
-std::string xmlEncode(std::string& data);
+std::string turtleStringEncode(std::string& data);

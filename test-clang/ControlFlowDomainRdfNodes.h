@@ -181,7 +181,7 @@ public:
 		ss << string(attributesOffest + 4, ' ') << ":algorithm ;\n";
 		ss << string(attributesOffest, ' ') << ":entry_point " << this->getSequence()->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":global_code " << this->getSequence()->getNodeRef() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":algorithm_name \"" << xmlEncode(this->algorithmName) << "\"^^xsd:string; \n";
+		ss << string(attributesOffest, ' ') << ":algorithm_name \"" << turtleStringEncode(this->algorithmName) << "\"^^xsd:string; \n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
 
@@ -211,7 +211,7 @@ public:
 		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":expr ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
-		ss << string(attributesOffest, ' ') << ":stmt_name \"" << xmlEncode(this->text) << "\"^^xsd:string .\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
 private:
@@ -247,7 +247,7 @@ public:
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
-		ss << string(attributesOffest, ' ') << ":stmt_name \"" << xmlEncode(this->text) << "\"^^xsd:string .\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
 private:

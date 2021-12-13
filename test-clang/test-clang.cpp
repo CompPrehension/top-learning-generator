@@ -54,7 +54,7 @@ public:
 
                 cout << stringRepr << endl;
 
-                //string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\output\\expression_" + to_string(++counter) + ".rdf";
+                //string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\output\\expression_" + to_string(++counter) + ".ttl";
                 //std::ofstream file(filename);
                 //file << rdfString;
 
@@ -95,7 +95,7 @@ public:
                 std::cout << rdfString;
 
                 
-                string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\" + algoName + ".rdf";
+                string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\" + algoName + ".ttl";
                 std::ofstream file(filename);
                 file << "# Original function\n";
                 file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
