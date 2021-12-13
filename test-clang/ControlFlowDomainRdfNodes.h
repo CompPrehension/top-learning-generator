@@ -132,11 +132,11 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body_item " << this->getBody()[0]->getNodeRef() << " \n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->getBody()[0]->getNodeRef() << (this->body.size() == 1 ? " ;\n" : " ,\n");
 		for (int i = 1; i < this->getBody().size(); ++i)
 		{
 			ss << string(attributesOffest + 11, ' ') << this->getBody()[i]->getNodeRef();
-			ss << ((i != this->getBody().size() - 1) ? " \n" : " ;\n");
+			ss << ((i != this->getBody().size() - 1) ? " ,\n" : " ;\n");
 		}
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
@@ -387,11 +387,11 @@ public:
 		ss << string(attributesOffest + 4, ' ') << ":alternative ;\n";
 		
 		
-		ss << string(attributesOffest, ' ') << ":branches_item " << this->alternatives[0]->getNodeRef() << " \n";
+		ss << string(attributesOffest, ' ') << ":branches_item " << this->alternatives[0]->getNodeRef() << (this->alternatives.size() == 1 ? " ;\n" : " ,\n");
 		for (int i = 1; i < this->alternatives.size(); ++i)
 		{
 			ss << string(attributesOffest + 15, ' ') << this->alternatives[i]->getNodeRef();
-			ss << ((i != this->alternatives.size() - 1) ? " \n" : " ;\n");
+			ss << ((i != this->alternatives.size() - 1) ? " ,\n" : " ;\n");
 		}
 		if (this->getNext())
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
@@ -447,11 +447,11 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << (this->body.size() == 1 ? " ;\n" : " ,\n");
 		for (int i = 1; i < this->body.size(); ++i)
 		{
 			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
-			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+			ss << ((i != this->body.size() - 1) ? " ,\n" : " ;\n");
 		}
 		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
@@ -505,11 +505,11 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << (this->body.size() == 1 ? " ;\n" : " ,\n");
 		for (int i = 1; i < this->body.size(); ++i)
 		{
 			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
-			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+			ss << ((i != this->body.size() - 1) ? " ,\n" : " ;\n");
 		}
 		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
@@ -563,11 +563,11 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << " \n";
+		ss << string(attributesOffest, ' ') << ":body_item " << this->body[0]->getNodeRef() << (this->body.size() == 1 ? " ;\n" : " ,\n");
 		for (int i = 1; i < this->body.size(); ++i)
 		{
 			ss << string(attributesOffest + 11, ' ') << this->body[i]->getNodeRef();
-			ss << ((i != this->body.size() - 1) ? " \n" : " ;\n");
+			ss << ((i != this->body.size() - 1) ? " ,\n" : " ;\n");
 		}
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";

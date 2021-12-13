@@ -104,6 +104,14 @@ public:
                 file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
                 file << "\n\n";
                 file << "# rdf:\n\n";
+                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
+
                 file << rdfString;
             } __finally {
                 if (dstNode)
