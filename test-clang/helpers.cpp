@@ -2,6 +2,7 @@
 #include <clang/AST/NestedNameSpecifier.h>
 #include <clang/Lex/Lexer.h>
 
+
 /**
  * Gets the portion of the code that corresponds to given SourceRange, including the
  * last token. Returns expanded macros.
@@ -107,3 +108,17 @@ std::string turtleStringEncode(std::string& data) {
     }
     return buffer;
 }
+
+
+
+bool fileExists(string& pathToDir, string& fileNamePart) 
+{
+    for (const auto& entry : fs::directory_iterator(pathToDir))
+    {
+        auto s = entry.path().string();
+        if (s.find(fileNamePart) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+

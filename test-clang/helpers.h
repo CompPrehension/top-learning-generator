@@ -5,6 +5,14 @@
 #include <sstream>
 #include <regex>
 
+
+#include <string>
+#include <iostream>
+#include <filesystem>
+
+using namespace std;
+namespace fs = std::filesystem;
+
 using std::string;
 using std::stringstream;
 
@@ -44,3 +52,6 @@ string removeNewLines(const string& source);
 string removeMultipleSpaces(const string& source);
 
 std::string turtleStringEncode(std::string& data);
+
+bool fileExists(string& pathToDir, string& fileNamePart);
+    

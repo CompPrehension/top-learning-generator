@@ -78,7 +78,7 @@ public:
 
                 auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
                 auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
-                
+                                
                 std::cout << "\n\n\n\n\n";                
                 std::cout << originalCode;
                 std::cout << "\n\n\n\n\n";
@@ -86,16 +86,24 @@ public:
                 std::cout << "\n\n\n\n\n";
 
 
+                auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);
                 auto time = std::time(0);
-                auto algoName = to_string(++counter) + string("__") + dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(time);
+                auto functionId = dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(normalizedCodeHash);
+                
+                // if file with this name already exists - skip this function
+                string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
+                if (fileExists(outputDir, functionId))
+                {
+                    return;
+                }
+                
+                auto algoName = functionId + string("__") + to_string(time);
                 rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
                 auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
 
-
                 std::cout << rdfString;
-
                 
-                string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\" + algoName + ".ttl";
+                string filename = outputDir + algoName + ".ttl";
                 std::ofstream file(filename);
                 file << "# Original function\n";
                 file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
@@ -158,8 +166,8 @@ int main(int argc, const char** argv) {
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), & Printer);
+    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }
