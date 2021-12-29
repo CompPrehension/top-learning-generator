@@ -36,28 +36,47 @@ public:
     virtual void run(const MatchFinder::MatchResult& Result) {
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
-            return;
             ExpressionDomainNode* dstNode = NULL;
             __try {
+                auto rawExpr = get_source_text_raw_tr(node->getSourceRange(), *Result.SourceManager);
                 dstNode = mapToDst(node, Result.SourceManager);
 
                 if (!isValidNode(dstNode))
                     return;
 
-                //std::cout << dstNode->toString();
-                //std::cout << "\n";
-                auto s = get_source_text_raw(node->getSourceRange(), *Result.SourceManager);
-
-                auto stringRepr = dstNode->toString();
+                auto normalizedExpressionStr = dstNode->toString();
                 auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
-                auto rdfString = rdfTreeToString(stringRepr, rdfTree);
+                auto rdfString = rdfTreeToString(rdfTree);
+                std::cout << normalizedExpressionStr << "\n";
 
-                cout << stringRepr << endl;
+                auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
+                auto time = std::time(0);
+                auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
+                fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
+                
+                // if file with this name already exists - skip this function
+                string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\expressionoutput\\";
+                if (fileExists(outputDir, fileNamePart))
+                {
+                    return;
+                }
 
-                //string filename = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\output\\expression_" + to_string(++counter) + ".ttl";
-                //std::ofstream file(filename);
-                //file << rdfString;
+                string filename = outputDir + fileNamePart + "__" + to_string(time) + "__" + ".ttl";
+                std::ofstream file(filename);
+                file << "# Original expresson\n";
+                file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
+                file << "# " << "hash=" << expressionHash << "\n";
+                file << "\n\n";               
+                file << "# rdf:\n\n";
+                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
 
+                file << rdfString << "\n";
             } __finally {
                 if (dstNode)
                     delete dstNode;
@@ -166,8 +185,8 @@ int main(int argc, const char** argv) {
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }

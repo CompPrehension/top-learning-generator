@@ -42,6 +42,12 @@ std::string get_source_text_raw_tr(clang::SourceRange range, const clang::Source
     return clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(range), sm, clang::LangOptions()).str();
 }
 
+string stringRegexReplace(const string& source, const string& re, const string& replaceWith)
+{
+    regex reg(re);
+    return regex_replace(source, reg, replaceWith);
+}
+
 string stringReplace(const string& source, const string& toReplace, const string& replaceWith)
 {
     size_t pos = 0;

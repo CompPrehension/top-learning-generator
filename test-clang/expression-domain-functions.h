@@ -21,4 +21,4 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
 vector<ExpressionDomainRdfNode> mapToExressionDomainRdfNodes(ExpressionDomainNode* node);
 
 /* Converts rdf object model to plain text */
-string rdfTreeToString(string stingExpr, vector<ExpressionDomainRdfNode>& nodes);
+string rdfTreeToString(vector<ExpressionDomainRdfNode>& nodes);

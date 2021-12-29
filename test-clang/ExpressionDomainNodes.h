@@ -277,6 +277,38 @@ private:
 };
 
 
+class ExpressionDomainParenExprNode : public ExpressionDomainNode
+{
+public:
+	ExpressionDomainParenExprNode(clang::ParenExpr* astNode, ExpressionDomainNode* expr)
+		: ExpressionDomainNode(astNode), expr(expr)
+	{
+	}
+	~ExpressionDomainParenExprNode() 
+	{
+		if (expr)
+			delete expr;
+	}
+
+	ExpressionDomainNode* getExpr() { return this->expr; }
+
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "ParenExpr " << "\n";
+		if (this->expr)
+			this->expr->dump(level + 1);
+	}
+
+	string toString()
+	{
+		auto exprS = this->expr->toString();
+		return "(" + exprS + ")";
+	}
+
+private:
+	ExpressionDomainNode* expr;
+};
+
 class ExpressionDomainMemberExprNode : public ExpressionDomainNode
 {
 public:
@@ -367,6 +399,54 @@ public:
 private:
 	ExpressionDomainNode* arrayExpr;
 	ExpressionDomainNode* indexExpr;
+};
+
+class ExpressionDomainConditionalOperatorNode : public ExpressionDomainNode
+{
+public:
+	ExpressionDomainConditionalOperatorNode(clang::ConditionalOperator* astNode, ExpressionDomainNode* expr, ExpressionDomainNode* left, ExpressionDomainNode* right)
+		: ExpressionDomainNode(astNode), expr(expr), left(left), right(right)
+	{
+	}
+	~ExpressionDomainConditionalOperatorNode()
+	{
+		if (expr)
+			delete expr;
+		if (left)
+			delete left;
+		if (right)
+			delete right;
+	}
+
+	//string& getValue() { return this->value; }
+	void dump(int level = 0)
+	{
+		llvm::outs() << string(level, ' ') << "ternary operator " << "\n";
+		if (this->expr)
+			this->expr->dump(level + 1);
+		llvm::outs() << string(level, ' ') << "left branch" << "\n";
+		if (this->left)
+			this->left->dump(level + 1);
+		llvm::outs() << string(level, ' ') << "right branch" << "\n";
+		if (this->right)
+			this->right->dump(level + 1);
+	}
+
+	string toString()
+	{
+		auto exprS = this->expr->toString();
+		auto leftS = this->left ? this->left->toString() : "";
+		auto rightS = this->right ? this->right->toString() : "";
+		return exprS + " ? " + leftS + " : " + rightS;
+	}
+
+	ExpressionDomainNode* getExpr() { return this->expr; }
+	ExpressionDomainNode* getLeft() { return this->left; }
+	ExpressionDomainNode* getRight() { return this->right; }
+private:
+	ExpressionDomainNode* expr;
+	ExpressionDomainNode* left;
+	ExpressionDomainNode* right;
 };
 
 

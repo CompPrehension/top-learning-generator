@@ -43,7 +43,7 @@ std::string get_source_text_raw(clang::SourceRange range, const clang::SourceMan
 std::string get_source_text_raw_tr(clang::SourceRange range, const clang::SourceManager& sm);
 
 
-
+string stringRegexReplace(const string& source, const string& regex, const string& replaceWith);
 
 string stringReplace(const string& source, const string& toReplace, const string& replaceWith);
 

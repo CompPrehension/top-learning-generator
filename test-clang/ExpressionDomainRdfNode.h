@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <sstream>
+#include "helpers.h"
 
 using namespace std;
 
@@ -22,7 +23,7 @@ public:
 		if (isLast)
 			ss << ":last \"true\"^^xsd:boolean ;" << "\n";
 		ss << ":index " << "\"" << index << "\"" << "^^xsd:integer ;" << "\n";
-		ss << ":text " << "\"" << text << "\"" << "^^xsd:string ;" << "\n";
+		ss << ":text " << "\"" << turtleStringEncode(text) << "\"" << "^^xsd:string ;" << "\n";
 		ss << ":token_type " << "\"" << tokenType << "\"" << "^^xsd:string ." ;
 		return ss.str();
 	}

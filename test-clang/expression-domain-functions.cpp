@@ -76,7 +76,11 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
 
     if (node == nullptr)
         return nullptr;
-
+    if (auto parenOperator = dyn_cast<clang::ParenExpr>(node))
+    {
+        auto expr = mapToDst(parenOperator->getSubExpr(), sourceMgr);
+        return new ExpressionDomainParenExprNode((clang::ParenExpr*)parenOperator, expr);
+    }
     if (auto binaryOperator = dyn_cast<clang::BinaryOperator>(node))
     {
         auto left = mapToDst(binaryOperator->getLHS(), sourceMgr);
@@ -96,7 +100,7 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     }
     if (auto intValue = dyn_cast<clang::FloatingLiteral>((clang::Stmt*)node))
     {
-        auto value = intValue->getValue().convertToFloat();
+        auto value = intValue->getValue().convertToDouble();
         auto valueS = to_string(value);
         return new ExpressionDomainConstNode((clang::Stmt*)node, valueS);
     }
@@ -151,6 +155,13 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
         auto right = mapToDst(arr_sub_expr->getIdx(), sourceMgr);
         return new ExpressionDomainArrayBracketNode((clang::ArraySubscriptExpr*)arr_sub_expr, left, right);
     }
+    if (auto ternar_expr = dyn_cast<clang::ConditionalOperator>(node))
+    {
+        auto expr = mapToDst(ternar_expr->getCond(), sourceMgr);
+        auto left = mapToDst(ternar_expr->getTrueExpr(), sourceMgr);
+        auto right = mapToDst(ternar_expr->getFalseExpr(), sourceMgr);
+        return new ExpressionDomainConditionalOperatorNode((clang::ConditionalOperator*)ternar_expr, expr, left, right);
+    }
     /*
     if (auto funcDecl = dyn_cast<clang::FunctionDecl>(node))
     {
@@ -163,10 +174,9 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     return new ExpressionDomainUndefinedNode((clang::Stmt*)node);
 }
 
-string rdfTreeToString(string stingExpr, vector<ExpressionDomainRdfNode>& nodes)
+string rdfTreeToString( vector<ExpressionDomainRdfNode>& nodes)
 {
     std::stringstream ss;
-    ss << "# string expression representation: " << stingExpr << "\n";
     for (auto& node : nodes)
     {
         ss << "\n\n" << node.toString();
@@ -184,6 +194,12 @@ void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionD
 
     if (auto tmp = dynamic_cast<ExpressionDomainUndefinedNode*>(node))
     {
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainParenExprNode*>(node))
+    {
+        acc.push_back(ExpressionDomainRdfNode("operator", "()", ++index));
+        mapToExressionDomainRdfNodes(tmp->getExpr(), acc, index);
         return;
     }
     if (auto tmp = dynamic_cast<ExpressionDomainBinaryOperatorNode*>(node))
@@ -246,6 +262,14 @@ void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionD
         acc.push_back(ExpressionDomainRdfNode("array_open_bracket", "[", ++index));
         mapToExressionDomainRdfNodes(tmp->getIndexExpr(), acc, index);
         acc.push_back(ExpressionDomainRdfNode("array_close_bracket", "]", ++index));
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainConditionalOperatorNode*>(node))
+    {
+        mapToExressionDomainRdfNodes(tmp->getExpr(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("operator", "?:", ++index));
+        mapToExressionDomainRdfNodes(tmp->getLeft(), acc, index);
+        mapToExressionDomainRdfNodes(tmp->getRight(), acc, index);
         return;
     }
 }
