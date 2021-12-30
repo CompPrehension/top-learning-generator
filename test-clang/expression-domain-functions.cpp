@@ -18,6 +18,12 @@ void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operators
         _isValid = false;
         return;
     }
+    if (auto tmp = dynamic_cast<ExpressionDomainParenExprNode*>(node))
+    {
+        isValidNodeInner(tmp->getExpr(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
     if (auto tmp = dynamic_cast<ExpressionDomainBinaryOperatorNode*>(node))
     {
         isValidNodeInner(tmp->getLeftChild(), _isValid, operatorsCount);
@@ -59,6 +65,14 @@ void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operators
     {
         isValidNodeInner(tmp->getArrayExpr(), _isValid, operatorsCount);
         isValidNodeInner(tmp->getIndexExpr(), _isValid, operatorsCount);
+        ++operatorsCount;
+        return;
+    }
+    if (auto tmp = dynamic_cast<ExpressionDomainConditionalOperatorNode*>(node))
+    {
+        isValidNodeInner(tmp->getExpr(), _isValid, operatorsCount);
+        isValidNodeInner(tmp->getLeft(), _isValid, operatorsCount);
+        isValidNodeInner(tmp->getRight(), _isValid, operatorsCount);
         ++operatorsCount;
         return;
     }

@@ -17,14 +17,17 @@ public:
 	string toString()
 	{
 		std::stringstream ss;
-		ss << "<" << ExpressionDomainRdfNode::uri << "#" << "op__0__" << index << ">" << " rdf:type " << ExpressionDomainRdfNode::type << " ," << "\n";
+		auto nodeTag = "<" + ExpressionDomainRdfNode::uri + "#" + "op__0__" + to_string(index) + ">";
+		int spaces = nodeTag.size() + 4;
+
+		ss << nodeTag << " rdf:type " << ExpressionDomainRdfNode::type << " ;" << "\n";
 		if (isFirst)
-			ss << ":first \"true\"^^xsd:boolean ;" << "\n";
+			ss << string(spaces, ' ') << ":first \"true\"^^xsd:boolean ;" << "\n";
 		if (isLast)
-			ss << ":last \"true\"^^xsd:boolean ;" << "\n";
-		ss << ":index " << "\"" << index << "\"" << "^^xsd:integer ;" << "\n";
-		ss << ":text " << "\"" << turtleStringEncode(text) << "\"" << "^^xsd:string ;" << "\n";
-		ss << ":token_type " << "\"" << tokenType << "\"" << "^^xsd:string ." ;
+			ss << string(spaces, ' ') << ":last \"true\"^^xsd:boolean ;" << "\n";
+		ss << string(spaces, ' ') << ":index " << "\"" << index << "\"" << "^^xsd:integer ;" << "\n";
+		ss << string(spaces, ' ') << ":text " << "\"" << turtleStringEncode(text) << "\"" << "^^xsd:string ;" << "\n";
+		ss << string(spaces, ' ') << ":token_type " << "\"" << tokenType << "\"" << "^^xsd:string ." ;
 		return ss.str();
 	}
 
