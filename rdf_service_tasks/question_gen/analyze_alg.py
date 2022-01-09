@@ -6,7 +6,6 @@ from itertools import product, starmap
 from operator import add, eq
 from random import shuffle
 
-import networkx as nx
 import rdflib
 from rdflib import Graph, RDF
 

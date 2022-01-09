@@ -1,6 +1,6 @@
 fs
 pyfuseki
 rdflib
-yaml
+PyYAML
 # SPARQL-Burger < -- use patched local version
 # networkx < -- no longer used
