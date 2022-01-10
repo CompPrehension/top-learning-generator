@@ -212,8 +212,9 @@ void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionD
     }
     if (auto tmp = dynamic_cast<ExpressionDomainParenExprNode*>(node))
     {
-        acc.push_back(ExpressionDomainRdfNode("operator", "()", ++index));
+        acc.push_back(ExpressionDomainRdfNode("operator", "(", ++index));
         mapToExressionDomainRdfNodes(tmp->getExpr(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("operator", ")", ++index));
         return;
     }
     if (auto tmp = dynamic_cast<ExpressionDomainBinaryOperatorNode*>(node))
