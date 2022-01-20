@@ -62,6 +62,7 @@ class graph_lookup:
 ### pretty_rdf ###
 
 def pretty_rdf(s, prefixes:dict=PREFIXES):
+    'Simple-replace approach to make rdflib.*.n3() serializations look better'
     s = str(s)
     for p, ns in prefixes.items():
         s = s.replace(ns, p.rstrip(':') + ':')
