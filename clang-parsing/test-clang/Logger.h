@@ -6,13 +6,14 @@
 #include <format>
 #include <chrono>
 #include "helpers.h"
+#include <locale>
 
 using namespace std;
 
 class LogEntity
 {
 public:
-	string& message;
+	string message;
 	chrono::system_clock::time_point time;
 	char* level;
 };
@@ -39,13 +40,13 @@ public:
 	{
 		__try 
 		{
-			std::ofstream file(outputFilename);
+			std::ofstream fs(outputFilename);
 
 			for (auto ent : Logger::buffer)
 			{
-				file << "[" << getTimeStr(ent.time) << "] ";
-				file << "[" << ent.level << "] ";
-				file << ent.message << "\n";
+				fs << "[" << getTimeStr(ent.time).c_str() << "] ";
+				fs << "[" << ent.level << "] ";
+				fs << ent.message << "\n";
 			}
 		} 
 		__finally 

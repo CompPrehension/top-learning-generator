@@ -44,11 +44,13 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto forStmt = dyn_cast<clang::ForStmt>(stmt))
 	{
+		/*
 		if (!forStmt->getBody() || isa<clang::CompoundStmt>(forStmt->getBody()) && dyn_cast<clang::CompoundStmt>(forStmt->getBody())->body().empty())
 		{
 			Logger::warn("Empty ForStmt body - replace it with undefined stmt");
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
+		*/
 
 		auto init = mapToControlflowDst(forStmt->getInit());
 		auto expr = mapExprToControlflowDst(forStmt->getCond());
@@ -77,11 +79,13 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto whileStmt = dyn_cast<clang::WhileStmt>(stmt))
 	{
+		/*
 		if (!whileStmt->getBody() || isa<clang::CompoundStmt>(whileStmt->getBody()) && dyn_cast<clang::CompoundStmt>(whileStmt->getBody())->body().empty())
 		{
 			Logger::warn("Empty WhileStmt body - replace it with udefined stmt");
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
+		*/
 
 		auto expr = mapExprToControlflowDst(whileStmt->getCond());
 		auto body = mapToControlflowDst(whileStmt->getBody());
@@ -135,19 +139,23 @@ string getAstRawString(Stmt* node, clang::SourceManager& mgr)
 }
 
 
-std::stringstream& printExpr(std::stringstream& ss, ControlFlowDomainExprStmtNode* expr, clang::SourceManager& mgr)
+int printExpr(std::stringstream& ss, ControlFlowDomainExprStmtNode* expr, clang::SourceManager& mgr)
 {
 	if (expr == nullptr || expr->getAstNode() == nullptr)
-		return ss;
+		return 0;
 
 	auto s = removeMultipleSpaces(removeNewLines(get_source_text(expr->getAstNode()->getSourceRange(), mgr)));
 	if (s.length() == 0)
 	{
 		s = removeMultipleSpaces(removeNewLines(get_source_text_raw_tr(expr->getAstNode()->getSourceRange(), mgr)));
 	}
+	if (s.length() == 0)
+	{
+		s = removeMultipleSpaces(removeNewLines(get_source_text_raw(expr->getAstNode()->getSourceRange(), mgr)));
+	}
 
 	ss << s;
-	return ss;
+	return s.length();
 }
 
 
@@ -194,14 +202,18 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 				printTabs(ss, recursionLevel);
 
 				ss << "if (";
-				printExpr(ss, ifParts[i]->getExpr(), mgr);
+				int exprLength = printExpr(ss, ifParts[i]->getExpr(), mgr);
+				if (exprLength == 0)
+					throw string("Invalid expr");
 				ss << ")\n";
 			}
 			else 
 			{
 				printTabs(ss, recursionLevel);
 				ss << "else if (";
-				printExpr(ss, ifParts[i]->getExpr(), mgr);
+				int exprLength = printExpr(ss, ifParts[i]->getExpr(), mgr);
+				if (exprLength == 0)
+					throw string("Invalid expr");
 				ss << ")\n";
 			}
 			toCustomCppStringInner(ss, ifParts[i]->getThenBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(ifParts[i]->getThenBody()) ? recursionLevel : recursionLevel + 1);
@@ -217,7 +229,9 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 	{		
 		printTabs(ss, recursionLevel);
 		ss << "while (";
-		printExpr(ss, node->getExpr(), mgr);
+		int exprLength = printExpr(ss, node->getExpr(), mgr);
+		if (exprLength == 0)
+			throw string("Invalid expr");
 		ss << ")\n";
 		toCustomCppStringInner(ss, node->getBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getBody()) ? recursionLevel : recursionLevel + 1);
 		return;
@@ -228,7 +242,9 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 		ss << "do\n";
 		toCustomCppStringInner(ss, node->getBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getBody()) ? recursionLevel : recursionLevel + 1);
 		printTabs(ss, recursionLevel) << "while (";
-		printExpr(ss, node->getExpr(), mgr);
+		int exprLength = printExpr(ss, node->getExpr(), mgr);
+		if (exprLength == 0)
+			throw string("Invalid expr");
 		ss << ");\n";
 		return;
 	}
@@ -256,7 +272,9 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 		else
 		{
 			ss << "return ";
-			printExpr(ss, node->getExpr(), mgr);
+			int exprLength = printExpr(ss, node->getExpr(), mgr);
+			if (exprLength == 0)
+				throw string("Invalid expr");
 			ss << ";\n";
 		}
 		return;
@@ -264,7 +282,10 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 	if (auto node = dynamic_cast<ControlFlowDomainVarDeclStmtNode*>(stmt))
 	{		
 		printTabs(ss, recursionLevel);
-		ss << removeNewLines(get_source_text(node->getAstNode()->getSourceRange(), mgr));
+		auto s = removeNewLines(get_source_text(node->getAstNode()->getSourceRange(), mgr));
+		if (s.length() == 0)
+			throw string("Invalid expr");
+		ss << s;
 		ss << "\n";
 		return;
 	}

@@ -28,8 +28,6 @@ private:
 	Stmt* astNode;
 };
 
-
-
 class ControlFlowDomainUndefinedStmtNode : public ControlFlowDomainStmtNode
 {
 public:
@@ -56,7 +54,6 @@ public:
 	}
 
 	vector<ControlFlowDomainStmtNode*>& getChilds() { return this->stmts; }
-
 private:
 	vector<ControlFlowDomainStmtNode*> stmts;
 };
@@ -119,7 +116,6 @@ public:
 	ControlFlowDomainExprStmtNode* getOriginalExpr() { return this->ifParts[0]->getExpr(); }
 	vector<ControlFlowDomainIfStmtPart*>& getIfParts() { return this->ifParts; }
 	ControlFlowDomainStmtNode* getElseBody() { return this->elseBody; }
-
 private:
 	vector<ControlFlowDomainIfStmtPart*> ifParts;
 	ControlFlowDomainStmtNode* elseBody;
@@ -143,7 +139,6 @@ public:
 
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
-
 private:
 	ControlFlowDomainExprStmtNode* expr;
 	ControlFlowDomainStmtNode* body;
@@ -166,7 +161,6 @@ public:
 
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
-
 private:
 	ControlFlowDomainExprStmtNode* expr;
 	ControlFlowDomainStmtNode* body;
@@ -218,7 +212,6 @@ public:
 	}
 
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
-
 private:
 	ControlFlowDomainExprStmtNode* expr;
 };

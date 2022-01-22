@@ -17,6 +17,7 @@
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
 using namespace llvm;
+using json = nlohmann::json;
 
 // Apply a custom category to all command-line options so that they are the
 // only ones displayed.
@@ -102,22 +103,39 @@ private:
         ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
         string shortFilename = "";
         string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
-        string logsDir = outputDir + "Logs\\";
+        string logsDir = outputDir;
 
-        __try {
+        try {
+            string astNodeDump;
+            raw_string_ostream output(astNodeDump);
+            node->dump(output);
+
+            Logger::info("AST representation:");
+            Logger::info(astNodeDump);
+
+            Logger::info("Trying map to dst");
             dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
             if (!dstNode)
                 return;
+            Logger::info("Mapped successfully");
+            
+            //Logger::info(json::parse(&dstNode).dump());
 
             auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
-            auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
+            Logger::info("Original code:");
+            Logger::info(originalCode);
 
+            auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
+            Logger::info("Normalized code:");
+            Logger::info(normalizedCode);
+
+            /*
             std::cout << "\n\n\n\n\n";
             std::cout << originalCode;
             std::cout << "\n\n\n\n\n";
             std::cout << normalizedCode;
             std::cout << "\n\n\n\n\n";
-
+            */
 
             auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);
             auto time = std::time(0);
@@ -138,12 +156,12 @@ private:
             shortFilename = algoName + ".ttl";
             auto absolutePath = outputDir + shortFilename;
             std::ofstream file(absolutePath);
-            file << "# Original function\n";
-            file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
-            file << "\n\n";
-            file << "# Normalized function\n";
-            file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
-            file << "\n\n";
+            //file << "# Original function\n";
+            //file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
+            //file << "\n\n";
+            //file << "# Normalized function\n";
+            //file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
+            //file << "\n\n";
             file << "# rdf:\n\n";
             file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
             file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
@@ -154,18 +172,21 @@ private:
             file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
 
             file << rdfString;
+        } catch (string& err) {
+            Logger::error(err);
+        } catch (...) {
+            Logger::error("Unexpected error found");
         }
-        __finally {
-            if (dstNode)
-                delete dstNode;
-            if (rdfNode)
-                delete rdfNode;
 
-            if (shortFilename.length() > 0)
-                Logger::saveAndClear(logsDir + shortFilename);
-            else
-                Logger::clear();
-        }
+        if (dstNode)
+            delete dstNode;
+        if (rdfNode)
+            delete rdfNode;
+
+        if (shortFilename.length() > 0)
+            Logger::saveAndClear(logsDir + shortFilename + ".log.txt");
+        else
+            Logger::clear();
     }
 };
 
