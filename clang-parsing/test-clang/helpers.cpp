@@ -128,3 +128,11 @@ bool fileExists(string& pathToDir, string& fileNamePart)
     return false;
 }
 
+std::string getTimeStr(chrono::system_clock::time_point& time) {
+    std::time_t now = std::chrono::system_clock::to_time_t(time);
+
+    std::string s(30, '\0');
+    std::strftime(&s[0], s.size(), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    return s;
+}
+

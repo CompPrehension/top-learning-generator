@@ -172,6 +172,38 @@ private:
 	ControlFlowDomainStmtNode* body;
 };
 
+class ControlFlowDomainForStmtNode : public ControlFlowDomainStmtNode
+{
+public:
+	ControlFlowDomainForStmtNode(ForStmt* astNode, ControlFlowDomainStmtNode* init, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* inc, ControlFlowDomainStmtNode* body)
+		: ControlFlowDomainStmtNode(astNode), init(init), expr(expr), inc(inc), body(body)
+	{
+	}
+	~ControlFlowDomainForStmtNode()
+	{
+		if (this->init)
+			delete this->init;
+		if (this->expr)
+			delete this->expr;
+		if (this->inc)
+			delete this->inc;
+		if (this->body)
+			delete this->body;
+	}
+
+
+	ControlFlowDomainStmtNode* getInit() { return this->init; }
+	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
+	ControlFlowDomainStmtNode* getInc() { return this->inc; }
+	ControlFlowDomainStmtNode* getBody() { return this->body; }
+
+private:
+	ControlFlowDomainStmtNode* init;
+	ControlFlowDomainExprStmtNode* expr;
+	ControlFlowDomainStmtNode* inc;
+	ControlFlowDomainStmtNode* body;
+};
+
 class ControlFlowDomainReturnStmtNode : public ControlFlowDomainStmtNode
 {
 public:

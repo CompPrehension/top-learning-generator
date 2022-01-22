@@ -12,6 +12,7 @@
 #include "helpers.h"
 #include "cntrl-flow-domain-funtions.h"
 #include <ctime>
+#include "json.hpp"
 
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
@@ -31,121 +32,139 @@ static cl::extrahelp MoreHelp("\nMore help text...\n");
 
 
 class ExprPrinter : public MatchFinder::MatchCallback {
-    int counter = 0;
 public:
     virtual void run(const MatchFinder::MatchResult& Result) {
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
-            ExpressionDomainNode* dstNode = NULL;
-            __try {
-                auto rawExpr = get_source_text_raw_tr(node->getSourceRange(), *Result.SourceManager);
-                dstNode = mapToDst(node, Result.SourceManager);
-
-                if (!isValidNode(dstNode))
-                    return;
-
-                auto normalizedExpressionStr = dstNode->toString();
-                auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
-                auto rdfString = rdfTreeToString(rdfTree);
-                std::cout << normalizedExpressionStr << "\n";
-
-                auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
-                auto time = std::time(0);
-                auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
-                fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
-                
-                // if file with this name already exists - skip this function
-                string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\expressionoutput\\";
-                if (fileExists(outputDir, fileNamePart))
-                {
-                    return;
-                }
-
-                string filename = outputDir + fileNamePart + "__" + to_string(time) + "__" + ".ttl";
-                std::ofstream file(filename);
-                file << "# Original expresson\n";
-                file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
-                file << "# " << "hash=" << expressionHash << "\n";
-                file << "\n\n";               
-                file << "# rdf:\n\n";
-                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
-                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
-                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
-                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
-                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
-                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
-                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
-
-                file << rdfString << "\n";
-            } __finally {
-                if (dstNode)
-                    delete dstNode;
-            }
+            runForExpressionDomain(node, Result);
+            return;
         }
-
 
         if (auto node = Result.Nodes.getNodeAs<clang::FunctionDecl>("cntrlflowDomain"))
         {
-            ControlFlowDomainFuncDeclNode* dstNode = NULL;
-            ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
-            __try {
-                //node->dump();
+            runForCntrlFlowDomain(node, Result);
+            return;
+        }
+    }
 
-                dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
-                if (!dstNode)
-                    return;
+private:
+    void runForExpressionDomain(const clang::Expr* node, const MatchFinder::MatchResult& Result) {
+        ExpressionDomainNode* dstNode = NULL;
+        __try {
+            auto rawExpr = get_source_text_raw_tr(node->getSourceRange(), *Result.SourceManager);
+            dstNode = mapToDst(node, Result.SourceManager);
 
-                auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
-                auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
-                                
-                std::cout << "\n\n\n\n\n";                
-                std::cout << originalCode;
-                std::cout << "\n\n\n\n\n";
-                std::cout << normalizedCode;
-                std::cout << "\n\n\n\n\n";
+            if (!isValidNode(dstNode))
+                return;
 
+            auto normalizedExpressionStr = dstNode->toString();
+            auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
+            auto rdfString = rdfTreeToString(rdfTree);
+            std::cout << normalizedExpressionStr << "\n";
 
-                auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);
-                auto time = std::time(0);
-                auto functionId = dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(normalizedCodeHash);
-                
-                // if file with this name already exists - skip this function
-                string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
-                if (fileExists(outputDir, functionId))
-                {
-                    return;
-                }
-                
-                auto algoName = functionId + string("__") + to_string(time);
-                rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
-                auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
+            auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
+            auto time = std::time(0);
+            auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
+            fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
-                std::cout << rdfString;
-                
-                string filename = outputDir + algoName + ".ttl";
-                std::ofstream file(filename);
-                file << "# Original function\n";
-                file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
-                file << "\n\n";
-                file << "# Normalized function\n";
-                file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
-                file << "\n\n";
-                file << "# rdf:\n\n";
-                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
-                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
-                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
-                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
-                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
-                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
-                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
-
-                file << rdfString;
-            } __finally {
-                if (dstNode)
-                    delete dstNode;
-                if (rdfNode)
-                    delete rdfNode;
+            // if file with this name already exists - skip this function
+            string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\expressionoutput\\";
+            if (fileExists(outputDir, fileNamePart))
+            {
+                return;
             }
+
+            string filename = outputDir + fileNamePart + "__" + to_string(time) + "__" + ".ttl";
+            std::ofstream file(filename);
+            file << "# Original expresson\n";
+            file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
+            file << "# " << "hash=" << expressionHash << "\n";
+            file << "\n\n";
+            file << "# rdf:\n\n";
+            file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+            file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+            file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+            file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+            file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+            file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+            file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
+
+            file << rdfString << "\n";
+        }
+        __finally {
+            if (dstNode)
+                delete dstNode;
+        }
+    }
+
+    void runForCntrlFlowDomain(const clang::FunctionDecl* node, const MatchFinder::MatchResult& Result) {
+        ControlFlowDomainFuncDeclNode* dstNode = NULL;
+        ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
+        string shortFilename = "";
+        string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
+        string logsDir = outputDir + "Logs\\";
+
+        __try {
+            dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
+            if (!dstNode)
+                return;
+
+            auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
+            auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
+
+            std::cout << "\n\n\n\n\n";
+            std::cout << originalCode;
+            std::cout << "\n\n\n\n\n";
+            std::cout << normalizedCode;
+            std::cout << "\n\n\n\n\n";
+
+
+            auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);
+            auto time = std::time(0);
+            auto functionId = dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(normalizedCodeHash);
+
+            // if file with this name already exists - skip this function
+            if (fileExists(outputDir, functionId))
+            {
+                return;
+            }
+
+            auto algoName = functionId + string("__") + to_string(time);
+            rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
+            auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
+
+            std::cout << rdfString;
+
+            shortFilename = algoName + ".ttl";
+            auto absolutePath = outputDir + shortFilename;
+            std::ofstream file(absolutePath);
+            file << "# Original function\n";
+            file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
+            file << "\n\n";
+            file << "# Normalized function\n";
+            file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
+            file << "\n\n";
+            file << "# rdf:\n\n";
+            file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+            file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+            file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+            file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+            file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+            file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+            file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
+
+            file << rdfString;
+        }
+        __finally {
+            if (dstNode)
+                delete dstNode;
+            if (rdfNode)
+                delete rdfNode;
+
+            if (shortFilename.length() > 0)
+                Logger::saveAndClear(logsDir + shortFilename);
+            else
+                Logger::clear();
         }
     }
 };
@@ -185,8 +204,8 @@ int main(int argc, const char** argv) {
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }

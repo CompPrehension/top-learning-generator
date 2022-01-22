@@ -9,6 +9,7 @@
 #include <string>
 #include <iostream>
 #include <filesystem>
+#include <chrono>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -55,3 +56,4 @@ std::string turtleStringEncode(std::string& data);
 
 bool fileExists(string& pathToDir, string& fileNamePart);
     
+std::string getTimeStr(chrono::system_clock::time_point& time);

@@ -44,13 +44,25 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	}
 	if (auto forStmt = dyn_cast<clang::ForStmt>(stmt))
 	{
-		forStmt->getBeginLoc().isMacroID();
+		if (!forStmt->getBody() || isa<clang::CompoundStmt>(forStmt->getBody()) && dyn_cast<clang::CompoundStmt>(forStmt->getBody())->body().empty())
+		{
+			Logger::warn("Empty ForStmt body - replace it with undefined stmt");
+			return new ControlFlowDomainUndefinedStmtNode(stmt);
+		}
+
+		auto init = mapToControlflowDst(forStmt->getInit());
+		auto expr = mapExprToControlflowDst(forStmt->getCond());
+		auto inc = mapToControlflowDst(forStmt->getInc());
+		auto body = mapToControlflowDst(forStmt->getBody());
+
+		return new ControlFlowDomainForStmtNode(forStmt, init, expr, inc, body);
 	}
 	if (auto ifStmt = dyn_cast<clang::IfStmt>(stmt))
 	{
 		if (ifStmt->getThen() && isa<clang::CompoundStmt>(ifStmt->getThen()) && dyn_cast<clang::CompoundStmt>(ifStmt->getThen())->body().empty() ||
 			ifStmt->getElse() && isa<clang::CompoundStmt>(ifStmt->getElse()) && dyn_cast<clang::CompoundStmt>(ifStmt->getElse())->body().empty())
 		{
+			Logger::warn("Empty IfStmt both branches - replace it with undefined stmt");
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 
@@ -67,6 +79,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	{
 		if (!whileStmt->getBody() || isa<clang::CompoundStmt>(whileStmt->getBody()) && dyn_cast<clang::CompoundStmt>(whileStmt->getBody())->body().empty())
 		{
+			Logger::warn("Empty WhileStmt body - replace it with udefined stmt");
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 
@@ -78,6 +91,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 	{
 		if (!doStmt->getBody() || isa<clang::CompoundStmt>(doStmt->getBody()) && dyn_cast<clang::CompoundStmt>(doStmt->getBody())->body().empty())
 		{
+			Logger::warn("Empty DoStmt body - replace it with udefined stmt");
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 
@@ -216,6 +230,19 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 		printTabs(ss, recursionLevel) << "while (";
 		printExpr(ss, node->getExpr(), mgr);
 		ss << ");\n";
+		return;
+	}
+	if (auto node = dynamic_cast<ControlFlowDomainForStmtNode*>(stmt))
+	{
+		printTabs(ss, recursionLevel);
+		ss << "for (";
+		toCustomCppStringInner(ss, node->getInit(), mgr, isDebug, recursionLevel);
+		ss << ";";
+		printExpr(ss, node->getExpr(), mgr);
+		ss << ";";
+		toCustomCppStringInner(ss, node->getInc(), mgr, isDebug, recursionLevel);
+		ss << ")\n";
+		toCustomCppStringInner(ss, node->getBody(), mgr, isDebug, dynamic_cast<ControlFlowDomainStmtListNode*>(node->getBody()) ? recursionLevel : recursionLevel + 1);
 		return;
 	}
 	if (auto node = dynamic_cast<ControlFlowDomainReturnStmtNode*>(stmt))

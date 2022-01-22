@@ -25,6 +25,9 @@
     <Filter Include="Исходные файлы\cntrl-flow-domain">
       <UniqueIdentifier>{eaf9db95-f116-4411-aa3e-092aedb7db78}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Файлы заголовков\_thirdparty">
+      <UniqueIdentifier>{8865bf9d-e0e9-481b-9781-59ad4b13a0ba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test-clang.cpp">
@@ -61,6 +64,12 @@
     </ClInclude>
     <ClInclude Include="ControlFlowDomainRdfNodes.h">
       <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
+    </ClInclude>
+    <ClInclude Include="json.hpp">
+      <Filter>Файлы заголовков\_thirdparty</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>Файлы заголовков\_thirdparty</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
