@@ -415,9 +415,12 @@ public:
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
 
-		this->init->toString(ss);
-		this->expr->toString(ss);
-		this->inc->toString(ss);
+		if (this->init)
+			this->init->toString(ss);
+		if (this->expr)
+			this->expr->toString(ss);
+		if (this->inc)
+			this->inc->toString(ss);
 		this->body->toString(ss);
 	}
 

@@ -13,6 +13,6 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx);
 ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& astCtx);
 
 std::string toOriginalCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr);
-std::string toCustomCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr, bool isDebug = false);
+std::string toCustomCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr, ASTContext& astCtx, bool isDebug = false);
 
 ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(string algUniqueName, ControlFlowDomainFuncDeclNode* node, clang::SourceManager& mgr, ASTContext& astCtx);

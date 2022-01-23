@@ -240,7 +240,7 @@ public:
 			
 			// ensure expression right part is int constant 
 			Expr::EvalResult Result;
-			auto isRightConst = binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
+			auto isRightConst = !binaryExpr->getRHS()->isValueDependent() && binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
 			if (!isRightConst) {
 				Logger::info("Couldnt evaluate right part '<'");
 				goto fist_check_end;
@@ -260,7 +260,7 @@ public:
 				Logger::info("Couldnt find var decl info");
 				goto fist_check_end;
 			}
-			auto isVarEvaluated = vardecl->getInit() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
+			auto isVarEvaluated = vardecl->getInit() && !vardecl->getInit()->isValueDependent() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
 			if (!isVarEvaluated) {
 				Logger::info("Couldnt find var inital value");
 				goto fist_check_end;
@@ -307,7 +307,7 @@ public:
 
 			// ensure expression right part is int constant 
 			Expr::EvalResult Result;
-			auto isRightConst = binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
+			auto isRightConst = !binaryExpr->getRHS()->isValueDependent() && binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
 			if (!isRightConst) {
 				Logger::info("Couldnt evaluate right part '<='");
 				goto second_check_end;
@@ -327,7 +327,7 @@ public:
 				Logger::info("Couldnt find var decl info");
 				goto second_check_end;
 			}
-			auto isVarEvaluated = vardecl->getInit() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
+			auto isVarEvaluated = vardecl->getInit() && !vardecl->getInit()->isValueDependent() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
 			if (!isVarEvaluated) {
 				Logger::info("Couldnt find var inital value");
 				goto second_check_end;

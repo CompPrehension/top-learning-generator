@@ -128,7 +128,7 @@ private:
             Logger::info("Original code:");
             Logger::info(originalCode);
 
-            auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, true);
+            auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, *Result.Context, true);
             Logger::info("Normalized code:");
             Logger::info(normalizedCode);
 
@@ -177,7 +177,7 @@ private:
         if (isSuccess && shortFilename.length() > 0)
             Logger::saveAndClear(logsDir + shortFilename + ".log.txt");
         else
-            Logger::saveAndClear(logsDir + "__ERROR__" + functionName + "__" + to_string(std::time(0)) + ".log.txt");
+            Logger::saveAndClear(logsDir + "_______ERROR__" + functionName + "__" + to_string(std::time(0)) + ".log.txt");
 
     finally_lbl:
         cout << "Processed function " << functionName << endl;
