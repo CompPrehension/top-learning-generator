@@ -1,4 +1,5 @@
 #include "cntrl-flow-domain-funtions.h"
+using namespace llvm;
 
 
 ControlFlowDomainExprStmtNode* mapExprToControlflowDst(Expr* expr)
@@ -25,6 +26,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 
 	if (auto compoundStmt = dyn_cast<clang::CompoundStmt>(stmt))
 	{
+		Logger::info("Found CompoundStmt");
 		vector<ControlFlowDomainStmtNode*> childs;
 		for (auto stmt : compoundStmt->body())
 		{
@@ -34,6 +36,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	}		
 	if (auto declStmt = dyn_cast<clang::DeclStmt>(stmt))
 	{
+		Logger::info("Found DeclStmt");
 		bool isAllVarDecl = true;
 		for (auto childDecl : declStmt->getDeclGroup())
 		{
@@ -51,6 +54,8 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 		*/
+
+		Logger::info("Found ForStmt");
 
 		auto init = mapToControlflowDst(forStmt->getInit(), astCtx);
 		auto expr = mapExprToControlflowDst(forStmt->getCond());
@@ -70,6 +75,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 
+		Logger::info("Found IfStmt");
 		auto currentIf = ifStmt;
 		vector<ControlFlowDomainIfStmtPart*> ifParts;
 		do
@@ -89,6 +95,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 		}
 		*/
 
+		Logger::info("Found WhileStmt");
 		auto expr = mapExprToControlflowDst(whileStmt->getCond());
 		auto body = mapToControlflowDst(whileStmt->getBody(), astCtx);
 		return new ControlFlowDomainWhileStmtNode(whileStmt, expr, body);
@@ -101,19 +108,28 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 			return new ControlFlowDomainUndefinedStmtNode(stmt);
 		}
 
+		Logger::info("Found DoStmt");
 		auto expr = mapExprToControlflowDst(doStmt->getCond());
 		auto body = mapToControlflowDst(doStmt->getBody(), astCtx);
 		return new ControlFlowDomainDoWhileStmtNode(doStmt, expr, body);
 	}
 	if (auto returnStmt = dyn_cast<clang::ReturnStmt>(stmt))
 	{
+		Logger::info("Found return stmt");
 		auto expr = mapExprToControlflowDst(returnStmt->getRetValue());
 		return new ControlFlowDomainReturnStmtNode(returnStmt, expr);
 	}
 	if (auto exprStmt = dyn_cast<clang::Expr>(stmt))
 	{
+		Logger::info("Found expr stmt");
 		return mapExprToControlflowDst(exprStmt);
 	}
+
+	Logger::warn("Found undefined stmt with ast");
+	string stmtNodeDump;
+	raw_string_ostream output(stmtNodeDump);
+	stmt->dump(output, astCtx);
+	Logger::warn(stmtNodeDump);
 
 	return new ControlFlowDomainUndefinedStmtNode(stmt);
 }
