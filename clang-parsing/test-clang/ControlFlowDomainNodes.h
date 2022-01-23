@@ -164,7 +164,30 @@ public:
 
 	virtual void calculateComplexity(ASTContext& astCtx)
 	{
-		// not implemented yet
+		{
+			Logger::info("Trying to match pattern while(const) { }");
+
+			auto exprAst = dyn_cast<Expr>(this->expr->getAstNode());
+			if (!exprAst) {
+				Logger::info("Invalid loop expr");
+				return;
+			}
+
+			bool result;
+			if (exprAst->isValueDependent() || !exprAst->EvaluateAsBooleanCondition(result, astCtx, true)) {
+				Logger::info("Non constant expr");
+				return;
+			}
+
+			if (result)
+				this->complexity = ControlFlowCycleComplexity::InfiniteTimes();
+			else
+				this->complexity = ControlFlowCycleComplexity::ZeroTimes();
+
+			Logger::info("Pattern matched - new complexity = " + this->complexity.to_string());
+
+			return;
+		}
 	}
 
 private:
@@ -192,7 +215,30 @@ public:
 
 	virtual void calculateComplexity(ASTContext& astCtx)
 	{
-		// not implemented yet
+		{
+			Logger::info("Trying to match pattern do { } while (const)");
+
+			auto exprAst = dyn_cast<Expr>(this->expr->getAstNode());
+			if (!exprAst) {
+				Logger::info("Invalid loop expr");
+				return;
+			}
+
+			bool result;
+			if (exprAst->isValueDependent() || !exprAst->EvaluateAsBooleanCondition(result, astCtx, true)) {
+				Logger::info("Non constant expr");
+				return;
+			}
+
+			if (result)
+				this->complexity = ControlFlowCycleComplexity::InfiniteTimes();
+			else
+				this->complexity = ControlFlowCycleComplexity::NonZeroTimes();
+
+			Logger::info("Pattern matched - new complexity = " + this->complexity.to_string());
+
+			return;
+		}
 	}
 
 private:
@@ -220,65 +266,139 @@ public:
 	}
 
 	virtual void calculateComplexity(ASTContext & astCtx)
-	{		
+	{	
 		{
-			Logger::info("Trying to match pattern for(/*any*/; intVar < const; ++intVar)");
+			Logger::info("Trying to match pattern for(/*any*/; ; /* any */)");
 
-			if (!this->getExpr() || !this->getInc()) {
-				Logger::info("Empty expression or inc");
-				goto fist_check_end;
+			if (this->getExpr() && this->getExpr()->getAstNode()) {
+				Logger::info("Condition exists");
+				goto empty_cond_check_end;
+			}
+
+			Logger::info("Patern matched successfully");
+			this->complexity = ControlFlowCycleComplexity::InfiniteTimes();
+			Logger::info("New complexity = " + this->complexity.to_string());
+			return;
+		}
+		empty_cond_check_end:
+		
+		
+		{
+			Logger::info("Trying to match pattern for(/*any*/; const ; /*any*/)");
+
+			if (!this->getExpr() || !this->getExpr()->getAstNode()) {
+				Logger::info("Empty AST node");
+				goto constant_cond_check_end;
+			}
+
+			auto exprAst = dyn_cast<Expr>(this->expr->getAstNode());
+			if (!exprAst) {
+				Logger::info("Invalid loop expr");
+				goto constant_cond_check_end;
+			}
+
+			bool result;
+			if (exprAst->isValueDependent() || !exprAst->EvaluateAsBooleanCondition(result, astCtx, true)) {
+				Logger::info("Non constant expr");
+				goto constant_cond_check_end;
+			}
+
+			if (result)
+				this->complexity = ControlFlowCycleComplexity::InfiniteTimes();
+			else
+				this->complexity = ControlFlowCycleComplexity::ZeroTimes();
+
+			Logger::info("Patern matched successfully"); 
+			Logger::info("New complexity = " + this->complexity.to_string());
+		}
+		constant_cond_check_end:
+		
+		
+		
+		{
+			Logger::info("Trying to match pattern for(intVar = const /* or 'int intVar = const' */; intVar < const /* or 'intVar <= const' */; ++intVar)");
+
+			if (!this->getExpr() || !this->getInc() || !this->getInit()) {
+				Logger::info("Empty expression or inc or init");
+				goto constant_iteration_check_end;
 			}
 
 			// ensure middle expresiion is "<"
 			auto expr = dyn_cast<Expr>(this->getExpr()->getAstNode());
 			expr = expr->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts()->IgnoreParens();
 			auto binaryExpr = dyn_cast<BinaryOperator>(expr);
-			if (!binaryExpr || binaryExpr->getOpcode() != BinaryOperatorKind::BO_LT) {
-				Logger::info("Middle expression is not '<'");
-				goto fist_check_end;
+			if (!binaryExpr || (binaryExpr->getOpcode() != BinaryOperatorKind::BO_LT && binaryExpr->getOpcode() != BinaryOperatorKind::BO_LE)) {
+				Logger::info("Middle expression is not '<' or '<='");
+				goto constant_iteration_check_end;
 			}				
 			
 			// ensure expression right part is int constant 
 			Expr::EvalResult Result;
 			auto isRightConst = !binaryExpr->getRHS()->isValueDependent() && binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
 			if (!isRightConst) {
-				Logger::info("Couldnt evaluate right part '<'");
-				goto fist_check_end;
+				Logger::info("Couldnt evaluate right part of '<'('<=') operator");
+				goto constant_iteration_check_end;
 			}
 			auto rightValue = Result.Val.getInt().getExtValue();
 
 			// ensure expression left part is integer variable
 			auto varExpr = dyn_cast<DeclRefExpr>(binaryExpr->getLHS()->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts());
 			if (!varExpr || !varExpr->getDecl()->getType().getTypePtr()->isIntegerType()) {
-				Logger::info("Couldnt evaluate left part '<' or value isnt integer");
-				goto fist_check_end;
+				Logger::info("Couldnt evaluate left part '<'('<=') or value isnt integer");
+				goto constant_iteration_check_end;
 			}
 
-			// trying to evaluate var initial value 
-			auto vardecl = dyn_cast<VarDecl>(varExpr->getDecl());
-			if (!vardecl) {
-				Logger::info("Couldnt find var decl info");
-				goto fist_check_end;
+			// trying to evaluate var initial value 			
+			auto vardeclFromExpr = dyn_cast<VarDecl>(varExpr->getDecl());
+			uint64_t variableInitValue;
+			// 1) first option - cycle init stmt contains cycle var declaration
+			if (auto declStmt = dyn_cast<DeclStmt>(this->getInit()->getAstNode()))
+			{
+				bool containsVarDecl = false;
+				for (auto childDecl : declStmt->getDeclGroup())
+				{
+					containsVarDecl = containsVarDecl || (vardeclFromExpr == childDecl);
+				}
+				if (!containsVarDecl) {
+					Logger::info("No loop variable declaration found");
+					goto constant_iteration_check_end;
+				}
+
+				auto isVarEvaluated = vardeclFromExpr->getInit() && !vardeclFromExpr->getInit()->isValueDependent() && vardeclFromExpr->getInit()->EvaluateAsInt(Result, astCtx);
+				if (!isVarEvaluated) {
+					Logger::info("Couldnt find var inital value");
+					goto constant_iteration_check_end;
+				}
+				variableInitValue = Result.Val.getInt().getExtValue();
 			}
-			auto isVarEvaluated = vardecl->getInit() && !vardecl->getInit()->isValueDependent() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
-			if (!isVarEvaluated) {
-				Logger::info("Couldnt find var inital value");
-				goto fist_check_end;
+			// 2) second option - cycle contains cycle-var assisgment
+			else if (auto assigmentExpr = dyn_cast<BinaryOperator>(this->getInit()->getAstNode()))
+			{
+				if (assigmentExpr->getOpcode() != BinaryOperatorKind::BO_Assign) {
+					Logger::info("Init doesnt contais assigment");
+					goto constant_iteration_check_end;
+				}
+
+				auto isRightPartEvaluated = assigmentExpr->getRHS() && !assigmentExpr->getRHS()->isValueDependent() && assigmentExpr->getRHS()->EvaluateAsInt(Result, astCtx);
+				if (!isRightPartEvaluated) {
+					Logger::info("Couldnt evaluate right part of assigment");
+					goto constant_iteration_check_end;
+				}
+				variableInitValue = Result.Val.getInt().getExtValue();
 			}
-			auto variableValue = Result.Val.getInt().getExtValue();
 
 			// ensure last expression is increment
 			auto incExpressionAstNode = dyn_cast<Expr>(this->getInc()->getAstNode())->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts()->IgnoreParens();
 			auto incExpression = dyn_cast<UnaryOperator>(incExpressionAstNode);
 			if (incExpression->getOpcode() != UnaryOperatorKind::UO_PostInc && incExpression->getOpcode() != UnaryOperatorKind::UO_PreInc) {
 				Logger::info("Last expression isn't increment");
-				goto fist_check_end;
+				goto constant_iteration_check_end;
 			}
 
 			Logger::info("Pattern matched");
 
-			if (variableValue < rightValue)
-				complexity = ControlFlowCycleComplexity::NTimes(variableValue, true, rightValue, false);
+			if (variableInitValue < rightValue)
+				complexity = ControlFlowCycleComplexity::NTimes(variableInitValue, true, rightValue, binaryExpr->getOpcode() == BinaryOperatorKind::BO_LE);
 			else
 				complexity = ControlFlowCycleComplexity::ZeroTimes();
 		
@@ -286,75 +406,7 @@ public:
 
 			return;		
 		}
-	fist_check_end:
-
-		{
-			Logger::info("Trying to match pattern for(/*any*/; intVar <= const; ++intVar)");
-
-			if (!this->getExpr() || !this->getInc()) {
-				Logger::info("Empty expression or inc");
-				goto second_check_end;
-			}
-
-			// ensure middle expresiion is "<"
-			auto expr = dyn_cast<Expr>(this->getExpr()->getAstNode());
-			expr = expr->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts()->IgnoreParens();
-			auto binaryExpr = dyn_cast<BinaryOperator>(expr);
-			if (!binaryExpr || binaryExpr->getOpcode() != BinaryOperatorKind::BO_LE) {
-				Logger::info("Middle expression is not '<='");
-				goto second_check_end;
-			}
-
-			// ensure expression right part is int constant 
-			Expr::EvalResult Result;
-			auto isRightConst = !binaryExpr->getRHS()->isValueDependent() && binaryExpr->getRHS()->EvaluateAsInt(Result, astCtx);
-			if (!isRightConst) {
-				Logger::info("Couldnt evaluate right part '<='");
-				goto second_check_end;
-			}
-			auto rightValue = Result.Val.getInt().getExtValue();
-
-			// ensure expression left part is integer variable
-			auto varExpr = dyn_cast<DeclRefExpr>(binaryExpr->getLHS()->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts());
-			if (!varExpr || !varExpr->getDecl()->getType().getTypePtr()->isIntegerType()) {
-				Logger::info("Couldnt evaluate left part '<=' or value isnt integer");
-				goto second_check_end;
-			}
-
-			// trying to evaluate var initial value 
-			auto vardecl = dyn_cast<VarDecl>(varExpr->getDecl());
-			if (!vardecl) {
-				Logger::info("Couldnt find var decl info");
-				goto second_check_end;
-			}
-			auto isVarEvaluated = vardecl->getInit() && !vardecl->getInit()->isValueDependent() && vardecl->getInit()->EvaluateAsInt(Result, astCtx);
-			if (!isVarEvaluated) {
-				Logger::info("Couldnt find var inital value");
-				goto second_check_end;
-			}
-			auto variableValue = Result.Val.getInt().getExtValue();
-
-			// ensure last expression is increment
-			auto incExpressionAstNode = dyn_cast<Expr>(this->getInc()->getAstNode())->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts()->IgnoreParens();
-			auto incExpression = dyn_cast<UnaryOperator>(incExpressionAstNode);
-			if (incExpression->getOpcode() != UnaryOperatorKind::UO_PostInc && incExpression->getOpcode() != UnaryOperatorKind::UO_PreInc) {
-				Logger::info("Last expression isn't increment");
-				goto second_check_end;
-			}
-
-			Logger::info("Pattern matched");
-
-			if (variableValue <= rightValue)
-				complexity = ControlFlowCycleComplexity::NTimes(variableValue, true, rightValue, true);
-			else
-				complexity = ControlFlowCycleComplexity::ZeroTimes();
-
-			Logger::info("New complexity - " + complexity.to_string());
-
-			return;
-		}
-	second_check_end:
-
+		constant_iteration_check_end:
 
 
 		return;
