@@ -9,16 +9,16 @@ ControlFlowDomainExprStmtNode* mapExprToControlflowDst(Expr* expr)
 	return new ControlFlowDomainExprStmtNode(expr);
 }
 
-ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl)
+ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& astCtx)
 {
 	if (funcDecl == nullptr || !funcDecl->getBody() || (isa<clang::CompoundStmt>(funcDecl->getBody()) && dyn_cast<clang::CompoundStmt>(funcDecl->getBody())->body().empty()))
 		return nullptr;
 
-	auto body = mapToControlflowDst(funcDecl->getBody());
+	auto body = mapToControlflowDst(funcDecl->getBody(), astCtx);
 	return new ControlFlowDomainFuncDeclNode(funcDecl, body);
 }
 
-ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
+ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 {
 	if (stmt == nullptr)
 		return nullptr;
@@ -28,7 +28,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 		vector<ControlFlowDomainStmtNode*> childs;
 		for (auto stmt : compoundStmt->body())
 		{
-			childs.push_back(mapToControlflowDst(stmt));
+			childs.push_back(mapToControlflowDst(stmt, astCtx));
 		}
 		return new ControlFlowDomainStmtListNode(compoundStmt, childs);
 	}		
@@ -52,12 +52,14 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 		}
 		*/
 
-		auto init = mapToControlflowDst(forStmt->getInit());
+		auto init = mapToControlflowDst(forStmt->getInit(), astCtx);
 		auto expr = mapExprToControlflowDst(forStmt->getCond());
 		auto inc = mapExprToControlflowDst(forStmt->getInc());
-		auto body = mapToControlflowDst(forStmt->getBody());
+		auto body = mapToControlflowDst(forStmt->getBody(), astCtx);
 
-		return new ControlFlowDomainForStmtNode(forStmt, init, expr, inc, body);
+		auto result =  new ControlFlowDomainForStmtNode(forStmt, init, expr, inc, body);
+		result->calculateComplexity(astCtx);
+		return result;
 	}
 	if (auto ifStmt = dyn_cast<clang::IfStmt>(stmt))
 	{
@@ -72,9 +74,9 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 		vector<ControlFlowDomainIfStmtPart*> ifParts;
 		do
 		{
-			ifParts.push_back(new ControlFlowDomainIfStmtPart(currentIf, mapExprToControlflowDst(currentIf->getCond()), mapToControlflowDst(currentIf->getThen())));
+			ifParts.push_back(new ControlFlowDomainIfStmtPart(currentIf, mapExprToControlflowDst(currentIf->getCond()), mapToControlflowDst(currentIf->getThen(), astCtx)));
 		} while (currentIf->getElse() && isa<clang::IfStmt>(currentIf->getElse()) && (currentIf = dyn_cast<clang::IfStmt>(currentIf->getElse())));
-		auto _else = mapToControlflowDst(currentIf->getElse());
+		auto _else = mapToControlflowDst(currentIf->getElse(), astCtx);
 		return new ControlFlowDomainIfStmtNode(ifParts, _else);
 	}
 	if (auto whileStmt = dyn_cast<clang::WhileStmt>(stmt))
@@ -88,7 +90,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 		*/
 
 		auto expr = mapExprToControlflowDst(whileStmt->getCond());
-		auto body = mapToControlflowDst(whileStmt->getBody());
+		auto body = mapToControlflowDst(whileStmt->getBody(), astCtx);
 		return new ControlFlowDomainWhileStmtNode(whileStmt, expr, body);
 	}
 	if (auto doStmt = dyn_cast<clang::DoStmt>(stmt))
@@ -100,7 +102,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 		}
 
 		auto expr = mapExprToControlflowDst(doStmt->getCond());
-		auto body = mapToControlflowDst(doStmt->getBody());
+		auto body = mapToControlflowDst(doStmt->getBody(), astCtx);
 		return new ControlFlowDomainDoWhileStmtNode(doStmt, expr, body);
 	}
 	if (auto returnStmt = dyn_cast<clang::ReturnStmt>(stmt))

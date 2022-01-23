@@ -113,12 +113,13 @@ private:
             string astNodeDump;
             raw_string_ostream output(astNodeDump);
             node->dump(output);
+            node->dump();
 
             Logger::info("AST representation:");
             Logger::info(astNodeDump);
 
             Logger::info("Trying map to dst");
-            dstNode = mapToControlflowDst((clang::FunctionDecl*)node);
+            dstNode = mapToControlflowDst((clang::FunctionDecl*)node, *Result.Context);
             if (!dstNode)
                 return;
             Logger::info("Mapped successfully");

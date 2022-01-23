@@ -9,8 +9,8 @@
 
 using namespace std;
 
-ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt);
-ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl);
+ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx);
+ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& astCtx);
 
 std::string toOriginalCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr);
 std::string toCustomCppString(ControlFlowDomainFuncDeclNode* func, clang::SourceManager& mgr, bool isDebug = false);
