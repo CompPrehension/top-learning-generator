@@ -13,12 +13,13 @@ import re
 
 from rdflib.term import Literal
 from rdflib import RDF
+import rdflib
 
 from rdflib_utils import graph_lookup, pretty_rdf
 
 
 
-def fix_names_for_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True):
+def fix_names_in_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True):
     'try fix names in rdflib.Graph g in-place'
     fix_names_for_leaf_types(g, gl, quiet=quiet)
     fix_names_for_complex_types(g, gl, quiet=quiet)
@@ -42,24 +43,36 @@ noop_replacements = {
 }
 
 
+RE_IDENTIFIER = re.compile(r'\b[a-z_]\w+', flags=re.I)
+
+
 def fix_name(s, node_type=None):
     if "#define" in s:
         s = s.partition("#define")[0].strip()
 
     s = s.strip(stmt_sep)
 
+    # replace RETURN
+    if s.lower() == 'return':
+        s = 'result = 1'
+    elif re.match(r'return\b', s, flags=re.I):
+        s = s.replace('return', '', 1)
+        if 'result' in s.lower():
+            s = 'accept(%s)' % s.strip()
+        else:
+            s = 'result = ' + s.strip()
+
     if not s:
         return choice(noop_replacements.get(node_type) or [n for L in noop_replacements for n in L])
 
     if len(s) > max_length_limit:
-        m = re.search(r'[\w\d]+\([^)]{,25}\)', s)
+        m = re.search(r'[\w\d]+\([^)]{,%d}\)' % (max_length_limit - 10), s)
         if m:
             s = m[0] # replace all command with a smaller inner call
         else:
             # shrink words to first & last letters, except of first word
             flag_it = chain([0], repeat([1]))
-            s = re.sub(r'\w[\w\d]+', lambda m: m[0][0] + m[0][-1] if next(flag_it) else m[0], s)
-
+            s = RE_IDENTIFIER.sub(lambda m: m[0][0]+'…'+m[0][-1] if next(flag_it) and len(m[0]) > 4 else m[0], s)
 
     return s
 
@@ -154,4 +167,4 @@ if __name__ == '__main__':
 
     gl = graph_lookup(g, dict(g.namespace_manager.namespaces()))
 
-    fix_names_for_graph(g, gl, quiet=False)
+    fix_names_in_graph(g, gl, quiet=False)

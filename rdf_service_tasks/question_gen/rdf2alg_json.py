@@ -10,6 +10,7 @@
 
 import rdflib
 from rdflib import Graph
+from rdflib import RDF
 from rdflib.term import Literal, URIRef, BNode
 from rdflib.paths import Path
 
@@ -199,11 +200,11 @@ class AlgorithmGraphWalker(GView):
 						# it could be also done via 'item_index' values but these do not always exist.
 			for i, value in enumerate(values):
 				if isinstance(value, URIRef):
-                    values[i] = value.n3(g.namespace_manager)
-                    if values[i] in ('owl:NamedIndividual', ':first_item', ':last_item', ':linked_list'):  # hide this nodes as objects
-                        values[i] = None
-                    else:
-                        values[i] = remove_ns_prefix(values[i])
+					values[i] = value.n3(self.g.namespace_manager)
+					if values[i] in ('owl:NamedIndividual', ':first_item', ':last_item', ':linked_list'):  # hide this nodes as objects
+						values[i] = None
+					else:
+						values[i] = remove_ns_prefix(values[i])
 				if isinstance(value, AlgorithmGraphWalker):
 					values[i] = value.to_algorithm_json(_visited_nodes)
 			values = list(filter(lambda x: x is not None, values))
@@ -214,9 +215,131 @@ class AlgorithmGraphWalker(GView):
 		return d
 
 
+# Ищем последовательные stmt и удаляем лишние, пока не будет максимум 3 штуки подряд
+
+MAX_STMTS = 3
+
+def shrink_linear_stmts(g, gl, max_stmts=MAX_STMTS):
+	'Delete (not merge) subsequent statements when more than 3 occured'
+	STMT_class = gl(':stmt')
+
+	for subj in set(g.subjects(gl(':body_item'), None)):
+		stmt_count = sum( ((obj, RDF.type, STMT_class) in g) for obj in g.objects(subj, gl(':body_item')))
+		if stmt_count > max_stmts:
+			# print(subj.n3(), '->', stmt_count, '###', w[':body_item'])
+
+			w = GView(g, subj, gl)
+			index2stmt = {node.item_index : node for node in w[':body_item']
+						  if isinstance(node, GView) and node.exists(RDF.type, STMT_class)}
+			# print(index2stmt)
+			indices = sorted(index2stmt.keys())
+			# print(indices)
+			continuous_sequences = []
+			begin_i = indices[0]
+			for i1, i2 in zip(indices[0:-1], indices[1:]):
+				if i1 + 1 < i2:
+					if i1 - begin_i + 1 > MAX_STMTS:
+						continuous_sequences.append(tuple(range(begin_i, i1 + 1)))
+					begin_i = i2
+			if i2 - begin_i + 1 > MAX_STMTS:
+				continuous_sequences.append(tuple(range(begin_i, i2 + 1)))
+
+			def remove_node_from_sequence(node:GView):
+				# reassign `:next` links & `item_index` numbers
+				body_node = node.value(~gl(':body_item'))  # == subj
+				prev_node = node.value(~gl(':next'))
+				next_node = node.value(gl(':next'))
+				node.remove(':next', next_node)
+				body_node.remove(':body_item', node)
+				node.remove(None, None)  # del this node completely
+				if next_node:
+					prev_node.setvalue(':next', next_node)
+					# renumber the rest of nodes
+					i = node.item_index
+					while i is not None and next_node:
+						next_node.setvalue(':next_node', i)
+						next_node = next_node.value(':next')
+						i += 1
+				else:
+					prev_node.remove(gl(':next'), None)
+
+			# print(continuous_sequences)
+			for seq in continuous_sequences:
+				to_remove = seq[2:-1]  # retain first 2 and last 1
+				print('removing linear statements:', to_remove)
+				for node_i in to_remove:
+					remove_node_from_sequence(index2stmt[node_i])
+
+
+
+def find_subject_of_type(g, class_uri):
+	# class_uri = NS_code.get('algorithm')  # -> 'http://vstu.ru/poas/code#algorithm'
+	subjects = list(g.subjects(RDF.type, URIRef(class_uri)))
+
+	assert subjects, 'Graph should contain at least one root of rdf:type : "%s"' % class_uri
+
+	subject = subjects[0]
+	return subject
+
+
+def change_ext(filepath, target_ext='.json'):
+	return os.path.splitext(filepath)[0] + target_ext
+
+
+def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\cntrflowoutput_v4_json', ext_pattern='*.ttl'):
+	'convert all .ttl files in DIR_SRC to "algorithm" *.json into DEST_DIR'
+	from glob import glob
+	import json
+
+	from fix_alg_names import fix_names_in_graph
+
+	FORMAT_IN = "turtle"
+
+	def read_rdf(*files, rdf_format=None):
+		g = rdflib.Graph()
+		for file_in in files:
+			g.parse(location=file_in, format=rdf_format)
+		return g
+
+	root_class = NS_code.get('algorithm')
+
+	for i, fp in enumerate(glob(os.path.join(dir_src, ext_pattern))):
+		print(f'[{i}]\t', fp, end='\t')
+
+		g = read_rdf(fp, rdf_format=FORMAT_IN)
+
+		algorithm = find_subject_of_type(g, root_class)
+		w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
+
+		# 1. FIX names
+		fix_names_in_graph(g, w.gl)
+
+		# 2. REMOVE some statements
+		shrink_linear_stmts(g, w.gl)
+
+		# 3. EXPORT to algorithm_json
+		a_json = w.to_algorithm_json()
+
+		out = change_ext(
+			os.path.join(
+				dest_dir,
+				os.path.split(fp)[1]),
+			'.json')
+
+		with open(out, mode='w') as f:
+			data = json.dump(a_json, f, indent=1)
+		print('OK')
+
 
 
 if __name__ == '__main__':
+
+	if 1:
+		import os.path
+		ttl_2_json_batch(dir_src=r'c:/Temp2/cntrflowoutput_v5', dest_dir=r'c:/Temp2/cntrflowoutput_v5_json')
+		exit(0)
+
+
 	# test that it works
 	# see also Jupyter notebook at: /owlready/rdflib.Graph wrapper
 
@@ -234,11 +357,7 @@ if __name__ == '__main__':
 
 	from rdflib import RDF
 	root_class = NS_code.get('algorithm')  # 'http://vstu.ru/poas/code#algorithm'
-	algorithms = list(g.subjects(RDF.type, URIRef(root_class)))
-
-	assert algorithms, 'Graph should contain at least one root of rdf:type : "%s"' % root_class
-
-	algorithm = algorithms[0]
+	algorithm = find_subject_of_type(g, root_class)
 
 
 	# create GraphView (domain-specific walker)
