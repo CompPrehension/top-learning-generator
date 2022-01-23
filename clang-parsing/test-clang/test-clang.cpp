@@ -101,11 +101,15 @@ private:
     void runForCntrlFlowDomain(const clang::FunctionDecl* node, const MatchFinder::MatchResult& Result) {
         ControlFlowDomainFuncDeclNode* dstNode = NULL;
         ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
+        string functionName;
         string shortFilename = "";
         string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
         string logsDir = outputDir;
+        bool isSuccess = false;
 
         try {
+            functionName = node->getDeclName().getAsString();
+
             string astNodeDump;
             raw_string_ostream output(astNodeDump);
             node->dump(output);
@@ -118,8 +122,6 @@ private:
             if (!dstNode)
                 return;
             Logger::info("Mapped successfully");
-            
-            //Logger::info(json::parse(&dstNode).dump());
 
             auto originalCode = toOriginalCppString(dstNode, *Result.SourceManager);
             Logger::info("Original code:");
@@ -129,39 +131,25 @@ private:
             Logger::info("Normalized code:");
             Logger::info(normalizedCode);
 
-            /*
-            std::cout << "\n\n\n\n\n";
-            std::cout << originalCode;
-            std::cout << "\n\n\n\n\n";
-            std::cout << normalizedCode;
-            std::cout << "\n\n\n\n\n";
-            */
-
-            auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);
-            auto time = std::time(0);
-            auto functionId = dstNode->getAstNode()->getDeclName().getAsString() + string("__") + to_string(normalizedCodeHash);
+            // calculate output file name            
+            auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);            
+            auto functionId = functionName + string("__") + to_string(normalizedCodeHash);
 
             // if file with this name already exists - skip this function
             if (fileExists(outputDir, functionId))
             {
-                return;
+                goto finally_lbl;
             }
 
+            auto time = std::time(0);
             auto algoName = functionId + string("__") + to_string(time);
             rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
             auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
-
-            std::cout << rdfString;
+            Logger::info("Successfully converted to rdf");
 
             shortFilename = algoName + ".ttl";
             auto absolutePath = outputDir + shortFilename;
             std::ofstream file(absolutePath);
-            //file << "# Original function\n";
-            //file << "# " << stringReplace(stringReplace(stringReplace(originalCode, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ");
-            //file << "\n\n";
-            //file << "# Normalized function\n";
-            //file << "# " << stringReplace(normalizedCode, "\n", "\n# ");
-            //file << "\n\n";
             file << "# rdf:\n\n";
             file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
             file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
@@ -170,8 +158,10 @@ private:
             file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
             file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
             file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
-
             file << rdfString;
+            
+            Logger::info("RDF Successfully saved to file");
+            isSuccess = true;
         } catch (string& err) {
             Logger::error(err);
         } catch (...) {
@@ -183,10 +173,14 @@ private:
         if (rdfNode)
             delete rdfNode;
 
-        if (shortFilename.length() > 0)
+        if (isSuccess && shortFilename.length() > 0)
             Logger::saveAndClear(logsDir + shortFilename + ".log.txt");
         else
-            Logger::clear();
+            Logger::saveAndClear(logsDir + "__ERROR__" + functionName + "__" + to_string(std::time(0)) + ".log.txt");
+
+    finally_lbl:
+        cout << "Processed function " << functionName << endl;
+        Logger::clear();
     }
 };
 

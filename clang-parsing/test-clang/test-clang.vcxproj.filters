@@ -69,7 +69,7 @@
       <Filter>Файлы заголовков\_thirdparty</Filter>
     </ClInclude>
     <ClInclude Include="Logger.h">
-      <Filter>Файлы заголовков\_thirdparty</Filter>
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
