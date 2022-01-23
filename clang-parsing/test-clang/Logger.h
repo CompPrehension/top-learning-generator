@@ -7,15 +7,18 @@
 #include <chrono>
 #include "helpers.h"
 #include <locale>
+#include "enum.h"
 
 using namespace std;
+
+BETTER_ENUM(LogLevel, int, INFO, ERROR,	WARNING)
 
 class LogEntity
 {
 public:
 	string message;
 	chrono::system_clock::time_point time;
-	char* level;
+	LogLevel level;
 };
 
 class Logger 
@@ -23,17 +26,17 @@ class Logger
 public:
 	static void info(string msg)
 	{
-		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevels[0] });
+		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevel::INFO });
 	}
 
 	static void error(string msg)
 	{
-		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevels[1] });
+		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevel::ERROR });
 	}
 
 	static void warn(string msg)
 	{
-		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevels[2] });
+		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevel::WARNING });
 	}
 
 	static void saveAndClear(string outputFilename)
@@ -62,13 +65,4 @@ public:
 
 private:
 	inline static vector<LogEntity> buffer;
-
-	static constexpr char* LogLevels[]
-	{
-		"INFO",
-		"ERROR",
-		"WARNING"
-	};
 };
-
-//vector<LogEntity> Logger::buffer = {};
