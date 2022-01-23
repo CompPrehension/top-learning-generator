@@ -113,7 +113,7 @@ private:
             string astNodeDump;
             raw_string_ostream output(astNodeDump);
             node->dump(output);
-            node->dump();
+            //node->dump();
 
             Logger::info("AST representation:");
             Logger::info(astNodeDump);
@@ -144,7 +144,7 @@ private:
 
             auto time = std::time(0);
             auto algoName = functionId + string("__") + to_string(time);
-            rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager);
+            rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager, *Result.Context);
             auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
             Logger::info("Successfully converted to rdf");
 

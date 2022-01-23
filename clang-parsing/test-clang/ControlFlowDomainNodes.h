@@ -123,11 +123,31 @@ private:
 	ControlFlowDomainStmtNode* elseBody;
 };
 
-class ControlFlowDomainWhileStmtNode : public ControlFlowDomainStmtNode
+
+class ControlFlowDomainAbstractCycleStmtNode : public ControlFlowDomainStmtNode
+{
+public:
+	ControlFlowDomainAbstractCycleStmtNode(Stmt* astNode, ControlFlowCycleComplexity complexity)
+		: ControlFlowDomainStmtNode(astNode), complexity(complexity)
+	{
+	}
+
+	ControlFlowCycleComplexity getComplexity() {
+		return complexity;
+	}
+
+	virtual void calculateComplexity(ASTContext & astCtx) = 0;
+
+protected:
+	ControlFlowCycleComplexity complexity;
+};
+
+
+class ControlFlowDomainWhileStmtNode : public ControlFlowDomainAbstractCycleStmtNode
 {
 public:
 	ControlFlowDomainWhileStmtNode(WhileStmt* astNode, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* body)
-		: ControlFlowDomainStmtNode(astNode), expr(expr), body(body)
+		: ControlFlowDomainAbstractCycleStmtNode(astNode, ControlFlowCycleComplexity::Undefined()), expr(expr), body(body)
 	{
 	}
 	~ControlFlowDomainWhileStmtNode() 
@@ -141,16 +161,22 @@ public:
 
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
+
+	virtual void calculateComplexity(ASTContext& astCtx)
+	{
+		// not implemented yet
+	}
+
 private:
 	ControlFlowDomainExprStmtNode* expr;
 	ControlFlowDomainStmtNode* body;
 };
 
-class ControlFlowDomainDoWhileStmtNode : public ControlFlowDomainStmtNode
+class ControlFlowDomainDoWhileStmtNode : public ControlFlowDomainAbstractCycleStmtNode
 {
 public:
 	ControlFlowDomainDoWhileStmtNode(DoStmt* astNode, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* body)
-		: ControlFlowDomainStmtNode(astNode), expr(expr), body(body)
+		: ControlFlowDomainAbstractCycleStmtNode(astNode, ControlFlowCycleComplexity::NonZeroTimes()), expr(expr), body(body)
 	{
 	}
 	~ControlFlowDomainDoWhileStmtNode()
@@ -163,16 +189,22 @@ public:
 
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
+
+	virtual void calculateComplexity(ASTContext& astCtx)
+	{
+		// not implemented yet
+	}
+
 private:
 	ControlFlowDomainExprStmtNode* expr;
 	ControlFlowDomainStmtNode* body;
 };
 
-class ControlFlowDomainForStmtNode : public ControlFlowDomainStmtNode
+class ControlFlowDomainForStmtNode : public ControlFlowDomainAbstractCycleStmtNode
 {
 public:
 	ControlFlowDomainForStmtNode(ForStmt* astNode, ControlFlowDomainStmtNode* init, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainExprStmtNode* inc, ControlFlowDomainStmtNode* body)
-		: ControlFlowDomainStmtNode(astNode), init(init), expr(expr), inc(inc), body(body), complexity(ControlFlowCycleComplexity::Undefined())
+		: ControlFlowDomainAbstractCycleStmtNode(astNode, ControlFlowCycleComplexity::Undefined()), init(init), expr(expr), inc(inc), body(body)
 	{
 	}
 	~ControlFlowDomainForStmtNode()
@@ -187,7 +219,7 @@ public:
 			delete this->body;
 	}
 
-	void calculateComplexity(ASTContext & astCtx)
+	virtual void calculateComplexity(ASTContext & astCtx)
 	{		
 		{
 			Logger::info("Trying to match pattern for(/*any*/; intVar < const; ++intVar)");
@@ -246,7 +278,7 @@ public:
 			Logger::info("Pattern matched");
 
 			if (variableValue < rightValue)
-				complexity = ControlFlowCycleComplexity::NTimes(rightValue - variableValue);
+				complexity = ControlFlowCycleComplexity::NTimes(variableValue, true, rightValue, false);
 			else
 				complexity = ControlFlowCycleComplexity::ZeroTimes();
 		
@@ -313,7 +345,7 @@ public:
 			Logger::info("Pattern matched");
 
 			if (variableValue <= rightValue)
-				complexity = ControlFlowCycleComplexity::NTimes(rightValue - variableValue + 1);
+				complexity = ControlFlowCycleComplexity::NTimes(variableValue, true, rightValue, true);
 			else
 				complexity = ControlFlowCycleComplexity::ZeroTimes();
 
@@ -339,7 +371,6 @@ private:
 	ControlFlowDomainExprStmtNode* expr;
 	ControlFlowDomainExprStmtNode* inc;
 	ControlFlowDomainStmtNode* body;
-	ControlFlowCycleComplexity complexity;
 };
 
 class ControlFlowDomainReturnStmtNode : public ControlFlowDomainStmtNode
