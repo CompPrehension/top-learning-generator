@@ -141,12 +141,22 @@ class GView:
 		for key in self.keys():
 			res_set.update(self.get(key))
 		return res_set
-
+	def __setitem__(self, prop, val):
+		'add a triple to graph'
+		val = val.s if isinstance(val, GView) else val
+		return self.g.add((self.s, self._make_prop(prop), val))
+	def setvalue(self, prop, val):
+		'set single value by prop replacing old triple if any'
+		val = val.s if isinstance(val, GView) else val
+		return self.g.set((self.s, self._make_prop(prop), val))
+	def remove(self, prop=None, val=None):
+		'Remove all matching triples from Graph. Note: calling without arguments will remove subject itself.'
+		val = val.s if isinstance(val, GView) else val
+		self.g.remove((self.s, self._make_prop(prop), val))
 
 
 def remove_ns_prefix(s):
-	return s.partition(':')[2] or s  # if no prefix, partition[2] will be empty
-
+	return s.partition(':')[2] or s  # `or`: if no prefix, partition[2] will be empty
 def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 	"Sort an arrays of AlgorithmGraphWalker instances according to (s)-->:next-->(o) relations"
 	def cmp_to_key(prop_name):
