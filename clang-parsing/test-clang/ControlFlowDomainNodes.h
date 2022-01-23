@@ -169,7 +169,7 @@ private:
 class ControlFlowDomainForStmtNode : public ControlFlowDomainStmtNode
 {
 public:
-	ControlFlowDomainForStmtNode(ForStmt* astNode, ControlFlowDomainStmtNode* init, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* inc, ControlFlowDomainStmtNode* body)
+	ControlFlowDomainForStmtNode(ForStmt* astNode, ControlFlowDomainStmtNode* init, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainExprStmtNode* inc, ControlFlowDomainStmtNode* body)
 		: ControlFlowDomainStmtNode(astNode), init(init), expr(expr), inc(inc), body(body)
 	{
 	}
@@ -188,13 +188,13 @@ public:
 
 	ControlFlowDomainStmtNode* getInit() { return this->init; }
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
-	ControlFlowDomainStmtNode* getInc() { return this->inc; }
+	ControlFlowDomainExprStmtNode* getInc() { return this->inc; }
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
 
 private:
 	ControlFlowDomainStmtNode* init;
 	ControlFlowDomainExprStmtNode* expr;
-	ControlFlowDomainStmtNode* inc;
+	ControlFlowDomainExprStmtNode* inc;
 	ControlFlowDomainStmtNode* body;
 };
 

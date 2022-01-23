@@ -54,7 +54,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt)
 
 		auto init = mapToControlflowDst(forStmt->getInit());
 		auto expr = mapExprToControlflowDst(forStmt->getCond());
-		auto inc = mapToControlflowDst(forStmt->getInc());
+		auto inc = mapExprToControlflowDst(forStmt->getInc());
 		auto body = mapToControlflowDst(forStmt->getBody());
 
 		return new ControlFlowDomainForStmtNode(forStmt, init, expr, inc, body);

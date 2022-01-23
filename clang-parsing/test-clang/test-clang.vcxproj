@@ -153,8 +153,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cntrl-flow-domain-funtions.h" />
+    <ClInclude Include="ControlFlowCycleComplexity.h" />
     <ClInclude Include="ControlFlowDomainNodes.h" />
     <ClInclude Include="ControlFlowDomainRdfNodes.h" />
+    <ClInclude Include="enum.h" />
     <ClInclude Include="expression-domain-functions.h" />
     <ClInclude Include="ExpressionDomainNodes.h" />
     <ClInclude Include="ExpressionDomainRdfNode.h" />

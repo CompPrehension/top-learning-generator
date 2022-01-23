@@ -71,5 +71,11 @@
     <ClInclude Include="Logger.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="ControlFlowCycleComplexity.h">
+      <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
+    </ClInclude>
+    <ClInclude Include="enum.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
