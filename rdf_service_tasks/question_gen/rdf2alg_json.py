@@ -304,7 +304,7 @@ def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\
 	root_class = NS_code.get('algorithm')
 
 	for i, fp in enumerate(glob(os.path.join(dir_src, ext_pattern))):
-		print(f'[{i}]\t', fp, end='\t')
+		print(f'[{i+1}]\t', fp, end='\t')
 
 		g = read_rdf(fp, rdf_format=FORMAT_IN)
 
@@ -312,7 +312,7 @@ def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\
 		w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
 
 		# 1. FIX names
-		fix_names_in_graph(g, w.gl)
+		fix_names_in_graph(g, w.gl, fix_complex_names=False)
 
 		# 2. REMOVE some statements
 		shrink_linear_stmts(g, w.gl)
@@ -336,7 +336,7 @@ if __name__ == '__main__':
 
 	if 1:
 		import os.path
-		ttl_2_json_batch(dir_src=r'c:/Temp2/cntrflowoutput_v5', dest_dir=r'c:/Temp2/cntrflowoutput_v5_json')
+		ttl_2_json_batch(dir_src=r'c:/Temp2/cntrflowoutput_v6', dest_dir=r'c:/Temp2/cntrflowoutput_v6_json')
 		exit(0)
 
 

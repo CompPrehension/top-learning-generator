@@ -19,10 +19,12 @@ from rdflib_utils import graph_lookup, pretty_rdf
 
 
 
-def fix_names_in_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True):
+def fix_names_in_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True, fix_leaf_names=True, fix_complex_names=True):
     'try fix names in rdflib.Graph g in-place'
-    fix_names_for_leaf_types(g, gl, quiet=quiet)
-    fix_names_for_complex_types(g, gl, quiet=quiet)
+    if fix_leaf_names:
+        fix_names_for_leaf_types(g, gl, quiet=quiet)
+    if fix_complex_names:
+        fix_names_for_complex_types(g, gl, quiet=quiet)
 
 
 
@@ -128,7 +130,7 @@ def shortname_for_type(type_name, **kw):
     else:
         suffix = '%02d' % randint(1, 99)
 
-    return prefix + suffix
+    return prefix + '_' + suffix
 
 
 # fix names of leaf_types
