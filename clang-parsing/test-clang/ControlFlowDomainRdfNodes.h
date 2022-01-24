@@ -10,18 +10,16 @@ using namespace std;
 class ControlFlowDomainRdfNode
 {
 public:
-	ControlFlowDomainRdfNode(string tokenType, int id)
-		: tokenType(tokenType), id(id)
-	{
-		this->nodeName = this->tokenType + "__" + to_string(id);
+	ControlFlowDomainRdfNode(string nodeNamePrefix, int id)
+		: id(id) {
+		this->nodeName = nodeNamePrefix + "_" + to_string(id);
+		this->nodeRef = "<" + ControlFlowDomainRdfNode::uri + this->nodeName + ">";
 	}
 
-	virtual ~ControlFlowDomainRdfNode()
-	{
+	virtual ~ControlFlowDomainRdfNode()	{
 	}
 
-	string toString()
-	{
+	string toString() {
 		stringstream ss;
 		this->toString(ss);
 		return ss.str();
@@ -29,14 +27,12 @@ public:
 
 	virtual void toString(stringstream& ss) = 0;
 
-	string getNodeName()
-	{
+	string& getNodeName() {
 		return this->nodeName;
 	}
 
-	string getNodeRef()
-	{
-		return "<" + ControlFlowDomainRdfNode::uri + getNodeName() + ">";
+	string& getNodeRef() {
+		return this->nodeRef;
 	}
 
 protected:
@@ -44,16 +40,18 @@ protected:
 	inline static string uri = "http://vstu.ru/poas/code#";
 
 	int id;
+
+private:
+	string nodeRef;
 	string nodeName;
-	string tokenType;
 };
 
 
 class ControlFlowDomainLinkedRdfNode : public ControlFlowDomainRdfNode
 {
 public:
-	ControlFlowDomainLinkedRdfNode(string tokenType, int id)
-		: ControlFlowDomainRdfNode(tokenType, id)
+	ControlFlowDomainLinkedRdfNode(string nodeNamePrefix, int id)
+		: ControlFlowDomainRdfNode(nodeNamePrefix, id)
 	{
 		next = NULL;
 		_isFirst = false;
@@ -94,9 +92,8 @@ class ControlFlowDomainSequenceRdfNode : public ControlFlowDomainLinkedRdfNode
 {
 public:
 	ControlFlowDomainSequenceRdfNode(int id, vector<ControlFlowDomainLinkedRdfNode*> body)
-		: ControlFlowDomainLinkedRdfNode("sequence", id), body(body)
+		: ControlFlowDomainLinkedRdfNode("B" /* aka block */, id), body(body)
 	{
-
 	}
 	~ControlFlowDomainSequenceRdfNode()
 	{
@@ -259,8 +256,8 @@ private:
 class ControlFlowDomainCycleRdfNode : public ControlFlowDomainLinkedRdfNode
 {
 public:
-	ControlFlowDomainCycleRdfNode(string tokenType, int id, ControlFlowCycleComplexity complexity)
-		: ControlFlowDomainLinkedRdfNode(tokenType, id), complexity(complexity)
+	ControlFlowDomainCycleRdfNode(int id, ControlFlowCycleComplexity complexity)
+		: ControlFlowDomainLinkedRdfNode("L" /* aka loop */, id), complexity(complexity)
 	{
 
 	}
@@ -279,7 +276,7 @@ class ControlFlowDomainDoWhileRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
 	ControlFlowDomainDoWhileRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainExprRdfNode* expr, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode("do_while_loop", id, complexity), expr(expr), body(body)
+		: ControlFlowDomainCycleRdfNode(id, complexity), expr(expr), body(body)
 	{
 	}
 	~ControlFlowDomainDoWhileRdfNode()
@@ -326,7 +323,7 @@ class ControlFlowDomainWhileDoRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
 	ControlFlowDomainWhileDoRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainExprRdfNode* expr, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode("while_loop", id, complexity), expr(expr), body(body)
+		: ControlFlowDomainCycleRdfNode(id, complexity), expr(expr), body(body)
 	{
 	}
 	~ControlFlowDomainWhileDoRdfNode()
@@ -372,8 +369,8 @@ private:
 class ControlFlowDomainForRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
-	ControlFlowDomainForRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainStmtRdfNode* init,	ControlFlowDomainExprRdfNode* expr,	ControlFlowDomainExprRdfNode* inc, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode("for_loop", id, complexity), init(init), expr(expr), inc(inc), body(body)
+	ControlFlowDomainForRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainStmtRdfNode* init,	ControlFlowDomainExprRdfNode* expr, ControlFlowDomainStmtRdfNode* inc, ControlFlowDomainSequenceRdfNode* body)
+		: ControlFlowDomainCycleRdfNode(id, complexity), init(init), expr(expr), inc(inc), body(body)
 	{
 	}
 	~ControlFlowDomainForRdfNode()
@@ -427,7 +424,7 @@ public:
 private:
 	ControlFlowDomainStmtRdfNode* init;
 	ControlFlowDomainExprRdfNode* expr;
-	ControlFlowDomainExprRdfNode* inc;
+	ControlFlowDomainStmtRdfNode* inc;
 	ControlFlowDomainSequenceRdfNode* body;
 };
 
@@ -445,7 +442,7 @@ class ControlFlowDomainAlternativeRdfNode : public ControlFlowDomainLinkedRdfNod
 {
 public:
 	ControlFlowDomainAlternativeRdfNode(int id, vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives)
-		: ControlFlowDomainLinkedRdfNode("alternative", id), alternatives(alternatives)
+		: ControlFlowDomainLinkedRdfNode("A" /* aka alternative */, id), alternatives(alternatives)
 	{
 	}
 	~ControlFlowDomainAlternativeRdfNode()

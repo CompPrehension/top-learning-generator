@@ -334,12 +334,20 @@ std::string toCustomCppString(ControlFlowDomainFuncDeclNode * func, clang::Sourc
 }
 
 
-ControlFlowDomainExprRdfNode* mapToRdfNode(ControlFlowDomainExprStmtNode* node, int& idGenerator, clang::SourceManager& mgr)
+ControlFlowDomainExprRdfNode* mapExprToRdfExprNode(ControlFlowDomainExprStmtNode* node, int& idGenerator, clang::SourceManager& mgr)
 {
 	if (node == NULL)
 		return NULL;
 
 	return new ControlFlowDomainExprRdfNode(++idGenerator, getAstRawString(node->getAstNode(), mgr));
+}
+
+ControlFlowDomainStmtRdfNode* mapExprToRdfStmtNode(ControlFlowDomainExprStmtNode* node, int& idGenerator, clang::SourceManager& mgr)
+{
+	if (node == NULL)
+		return NULL;
+
+	return new ControlFlowDomainStmtRdfNode(++idGenerator, getAstRawString(node->getAstNode(), mgr));
 }
 
 
@@ -426,7 +434,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			if (!seq)
 				return NULL;
 
-			auto expr = mapToRdfNode(ifParts[i]->getExpr(), idGenerator, mgr);
+			auto expr = mapExprToRdfExprNode(ifParts[i]->getExpr(), idGenerator, mgr);
 			ControlFlowDomainAlternativeBranchRdfNode* branchNode = (i == 0)
 				? (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()))
 				: (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeElseIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()));
@@ -461,21 +469,21 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 
 	if (auto castedNode = dynamic_cast<ControlFlowDomainWhileStmtNode*>(node))
 	{
-		auto exprRdf = mapToRdfNode(castedNode->getExpr(), idGenerator, mgr);
+		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
 		return new ControlFlowDomainWhileDoRdfNode(++idGenerator, castedNode->getComplexity(), exprRdf, bodyRdf);
 	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainDoWhileStmtNode*>(node))
 	{
-		auto exprRdf = mapToRdfNode(castedNode->getExpr(), idGenerator, mgr);
+		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
 		return new ControlFlowDomainDoWhileRdfNode(++idGenerator, castedNode->getComplexity(), exprRdf, bodyRdf);
 	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainForStmtNode*>(node))
 	{
 		auto initRdf = (ControlFlowDomainStmtRdfNode*)mapToRdfNode(castedNode->getInit(), idGenerator, mgr, astCtx);
-		auto exprRdf = mapToRdfNode(castedNode->getExpr(), idGenerator, mgr);
-		auto incRdf = mapToRdfNode(castedNode->getInc(), idGenerator, mgr);
+		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
+		auto incRdf = mapExprToRdfStmtNode(castedNode->getInc(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
 		return new ControlFlowDomainForRdfNode(++idGenerator, castedNode->getComplexity(), initRdf, exprRdf, incRdf, bodyRdf);
 	}
