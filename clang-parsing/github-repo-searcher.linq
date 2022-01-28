@@ -15,7 +15,7 @@
 var outputDir = @"C:\Users\Admin\Downloads\_c-repos";
 var repoMinSizeKb = 50;
 var repoMaxSizeKb = 100000;
-
+var targetRepoCount = 20;
 
 var client = new GitHubClient(new Octokit.ProductHeaderValue("CompPrehensionApp"));
 
@@ -34,14 +34,21 @@ do
 	};
 	var requestResult = await client.Search.SearchRepo(request);
 	repos.AddRange(requestResult.Items);
-} while (repos.Count < 100);
+} while (repos.Count < targetRepoCount);
 
+"Repos info loaded".Dump();
 
-foreach (var rep in repos)
+repos.AsParallel().ForAll(rep =>
 {
 	var targetRepoPath = Path.Combine(outputDir, string.Join("_", rep.FullName.Split('/')));
+	if (Directory.Exists(targetRepoPath))
+	{
+		$"Dir {targetRepoPath} exists - skipping".Dump();
+		return;
+	}
+
 	Directory.CreateDirectory(targetRepoPath);
 
 	$"Trying to clone {rep.FullName} to {targetRepoPath}".Dump();
-	LibGit2Sharp.Repository.Clone(rep.CloneUrl, targetRepoPath );
-}
+	LibGit2Sharp.Repository.Clone(rep.CloneUrl, targetRepoPath);
+});

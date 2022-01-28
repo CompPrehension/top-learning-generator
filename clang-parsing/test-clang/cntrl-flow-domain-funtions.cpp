@@ -361,7 +361,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 	if (auto castedNode = dynamic_cast<ControlFlowDomainUndefinedStmtNode*>(node))
 	{
 		// TODO validate that
-		auto val = new ControlFlowDomainStmtRdfNode(++idGenerator, "int tempUndefinedStmtReplacer" + to_string(idGenerator) + " = 0;");
+		auto val = new ControlFlowDomainStmtRdfNode(++idGenerator, "int temp_var_" + to_string(idGenerator) + " = 0;");
 		if (forceToSeq)
 		{
 			vector<ControlFlowDomainLinkedRdfNode*> body;
@@ -379,12 +379,15 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 
 	if (auto castedNode = dynamic_cast<ControlFlowDomainStmtListNode*>(node))
 	{
-		vector<ControlFlowDomainLinkedRdfNode*> body;
+		vector<ControlFlowDomainLinkedRdfNode*>body;
+		vector<int> undefinedStmtIdx;
 		ControlFlowDomainLinkedRdfNode* prev = NULL;
-		auto stmts = castedNode->getChilds();
+		auto& stmts = castedNode->getChilds();
 		ControlFlowDomainStmtNode* child;
 		for (int i = 0; (i < stmts.size()) && (child = stmts[i]); ++i)
 		{
+			if (IsType<ControlFlowDomainUndefinedStmtNode>(child))
+				undefinedStmtIdx.push_back(i);
 			auto current = mapToRdfNode(child, idGenerator, mgr, astCtx);
 			if (!current)
 				continue;
@@ -395,6 +398,22 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			current->setIndex(i);
 			body.push_back(current);
 			prev = current;
+		}
+		if (undefinedStmtIdx.size() > 0 && undefinedStmtIdx.size() < body.size())
+		{
+			for (int i = 0; i < undefinedStmtIdx.size(); ++i) {
+				auto val = body[undefinedStmtIdx[i]];
+				body.erase(body.begin() + undefinedStmtIdx[i]);
+				delete val;
+			}
+		}
+		if (body.size() > 1 && undefinedStmtIdx.size() == body.size())
+		{
+			for (int i = 0; i < undefinedStmtIdx.size() - 1; ++i) {
+				auto val = body[undefinedStmtIdx[i]];
+				body.erase(body.begin() + undefinedStmtIdx[i]);
+				delete val;
+			}
 		}
 		if (body.size() > 0)
 		{

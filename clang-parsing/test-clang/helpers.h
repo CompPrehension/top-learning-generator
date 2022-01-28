@@ -57,3 +57,9 @@ std::string turtleStringEncode(std::string& data);
 bool fileExists(string& pathToDir, string& fileNamePart);
     
 std::string getTimeStr(chrono::system_clock::time_point& time);
+
+template <class DstType, class SrcType>
+bool IsType(const SrcType* src)
+{
+    return dynamic_cast<const DstType*>(src) != nullptr;
+}

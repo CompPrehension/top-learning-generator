@@ -371,20 +371,56 @@ public:
 				}
 				variableInitValue = Result.Val.getInt().getExtValue();
 			}
-			// 2) second option - cycle contains cycle-var assisgment
-			else if (auto assigmentExpr = dyn_cast<BinaryOperator>(this->getInit()->getAstNode()))
+			// 2) second option - cycle contains cycle-var assisgment(s)
+			else if (auto binaryExpr = dyn_cast<BinaryOperator>(this->getInit()->getAstNode()))
 			{
-				if (assigmentExpr->getOpcode() != BinaryOperatorKind::BO_Assign) {
-					Logger::info("Init doesnt contais assigment");
-					goto constant_iteration_check_end;
+				vector<BinaryOperator*> assigments;
+				if (binaryExpr->getOpcode() == BinaryOperatorKind::BO_Assign) {
+					assigments.push_back(binaryExpr);
+				} else {
+					auto temp = binaryExpr;
+					while (temp && temp->getOpcode() == BinaryOperatorKind::BO_Comma) {
+						auto castedRight = dyn_cast<BinaryOperator>(temp->getRHS());
+						if (castedRight && castedRight->getOpcode() == BinaryOperatorKind::BO_Assign) {
+							assigments.push_back(castedRight);
+						}
+						auto castedLeft = dyn_cast<BinaryOperator>(temp->getLHS());
+						if (castedLeft && castedLeft->getOpcode() == BinaryOperatorKind::BO_Assign) {
+							assigments.push_back(castedLeft);
+						}
+						temp = castedLeft;
+					}
 				}
 
-				auto isRightPartEvaluated = assigmentExpr->getRHS() && !assigmentExpr->getRHS()->isValueDependent() && assigmentExpr->getRHS()->EvaluateAsInt(Result, astCtx);
-				if (!isRightPartEvaluated) {
-					Logger::info("Couldnt evaluate right part of assigment");
+				if (assigments.size() == 0) {
+					Logger::info("No var assigments found");
+					goto constant_iteration_check_end;
+				} else {
+					Logger::info("Found " + to_string(assigments.size()) + " assigments");
+				}
+
+				bool isFound = false;
+				for (auto assgmgnt : assigments) {
+					auto assLeft = dyn_cast<DeclRefExpr>(assgmgnt->getLHS()->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts());
+					if (assLeft->getDecl() != varExpr->getDecl())
+						continue;
+
+					Logger::info("Found var init assigment");
+					isFound = true;
+
+					auto isRightPartEvaluated = assgmgnt->getRHS() && !assgmgnt->getRHS()->isValueDependent() && assgmgnt->getRHS()->EvaluateAsInt(Result, astCtx);
+					if (!isRightPartEvaluated) {
+						Logger::info("Couldnt evaluate right part of assigment");
+						goto constant_iteration_check_end;
+					}
+					variableInitValue = Result.Val.getInt().getExtValue();
+					break;
+				}
+				
+				if (!isFound) {
+					Logger::info("Couldnt find cycle var assigment");
 					goto constant_iteration_check_end;
 				}
-				variableInitValue = Result.Val.getInt().getExtValue();
 			}
 
 			// ensure last expression is increment

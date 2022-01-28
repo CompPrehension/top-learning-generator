@@ -256,18 +256,28 @@ private:
 class ControlFlowDomainCycleRdfNode : public ControlFlowDomainLinkedRdfNode
 {
 public:
-	ControlFlowDomainCycleRdfNode(int id, ControlFlowCycleComplexity complexity)
-		: ControlFlowDomainLinkedRdfNode("L" /* aka loop */, id), complexity(complexity)
+	ControlFlowDomainCycleRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainSequenceRdfNode* body)
+		: ControlFlowDomainLinkedRdfNode("L" /* aka loop */, id), complexity(complexity), body(body)
 	{
 
+	}
+
+	~ControlFlowDomainCycleRdfNode() {
+		if (this->body)
+			delete this->body;
 	}
 
 	ControlFlowCycleComplexity getComplexity() {
 		return complexity;
 	}
 
+	ControlFlowDomainSequenceRdfNode* getBody() {
+		return body;
+	}
+
 private:
 	ControlFlowCycleComplexity complexity;
+	ControlFlowDomainSequenceRdfNode* body;
 };
 
 
@@ -276,15 +286,13 @@ class ControlFlowDomainDoWhileRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
 	ControlFlowDomainDoWhileRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainExprRdfNode* expr, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode(id, complexity), expr(expr), body(body)
+		: ControlFlowDomainCycleRdfNode(id, complexity, body), expr(expr)
 	{
 	}
 	~ControlFlowDomainDoWhileRdfNode()
 	{
 		if (this->expr)
-			delete this->expr;
-		if (this->body)
-			delete this->body;
+			delete this->expr;		
 	}
 
 	virtual void toString(stringstream& ss)
@@ -303,19 +311,18 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body " << this->getBody()->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":loop_complexity \"" << this->getComplexity().to_string() << "\"^^xsd:string ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
 
 		this->expr->toString(ss);
-		this->body->toString(ss);
+		this->getBody()->toString(ss);
 	}
 
 private:
 	ControlFlowDomainExprRdfNode* expr;
-	ControlFlowDomainSequenceRdfNode* body;
 };
 
 
@@ -323,15 +330,13 @@ class ControlFlowDomainWhileDoRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
 	ControlFlowDomainWhileDoRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainExprRdfNode* expr, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode(id, complexity), expr(expr), body(body)
+		: ControlFlowDomainCycleRdfNode(id, complexity, body), expr(expr)
 	{
 	}
 	~ControlFlowDomainWhileDoRdfNode()
 	{
 		if (this->expr)
 			delete this->expr;
-		if (this->body)
-			delete this->body;
 	}
 
 	virtual void toString(stringstream& ss)
@@ -350,19 +355,18 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body " << this->getBody()->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":cond " << this->expr->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":loop_complexity \"" << this->getComplexity().to_string() << "\"^^xsd:string ;\n";
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
 
 		this->expr->toString(ss);
-		this->body->toString(ss);
+		this->getBody()->toString(ss);
 	}
 
 private:
 	ControlFlowDomainExprRdfNode* expr;
-	ControlFlowDomainSequenceRdfNode* body;
 };
 
 
@@ -370,7 +374,7 @@ class ControlFlowDomainForRdfNode : public ControlFlowDomainCycleRdfNode
 {
 public:
 	ControlFlowDomainForRdfNode(int id, ControlFlowCycleComplexity complexity, ControlFlowDomainStmtRdfNode* init,	ControlFlowDomainExprRdfNode* expr, ControlFlowDomainStmtRdfNode* inc, ControlFlowDomainSequenceRdfNode* body)
-		: ControlFlowDomainCycleRdfNode(id, complexity), init(init), expr(expr), inc(inc), body(body)
+		: ControlFlowDomainCycleRdfNode(id, complexity, body), init(init), expr(expr), inc(inc)
 	{
 	}
 	~ControlFlowDomainForRdfNode()
@@ -381,8 +385,6 @@ public:
 			delete this->expr;
 		if (this->inc)
 			delete this->inc;
-		if (this->body)
-			delete this->body;
 	}
 
 	virtual void toString(stringstream& ss)
@@ -401,7 +403,7 @@ public:
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
 			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
-		ss << string(attributesOffest, ' ') << ":body " << this->body->getNodeRef() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":body " << this->getBody()->getNodeRef() << " ;\n";
 		if (this->init)
 			ss << string(attributesOffest, ' ') << ":init " << this->init->getNodeRef() << " ;\n";
 		if (this->expr)
@@ -418,14 +420,13 @@ public:
 			this->expr->toString(ss);
 		if (this->inc)
 			this->inc->toString(ss);
-		this->body->toString(ss);
+		this->getBody()->toString(ss);
 	}
 
 private:
 	ControlFlowDomainStmtRdfNode* init;
 	ControlFlowDomainExprRdfNode* expr;
 	ControlFlowDomainStmtRdfNode* inc;
-	ControlFlowDomainSequenceRdfNode* body;
 };
 
 
