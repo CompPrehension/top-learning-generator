@@ -47,12 +47,6 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	}
 	if (auto forStmt = dyn_cast<clang::ForStmt>(stmt))
 	{
-		if (!forStmt->getBody() || isa<clang::CompoundStmt>(forStmt->getBody()) && dyn_cast<clang::CompoundStmt>(forStmt->getBody())->body().empty())
-		{
-			Logger::warn("Empty ForStmt body - replace it with undefined stmt");
-			return new ControlFlowDomainUndefinedStmtNode(stmt);
-		}
-
 		Logger::info("Found ForStmt");
 
 		auto init = mapToControlflowDst(forStmt->getInit(), astCtx);
@@ -66,13 +60,6 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	}
 	if (auto ifStmt = dyn_cast<clang::IfStmt>(stmt))
 	{
-		if (ifStmt->getThen() && isa<clang::CompoundStmt>(ifStmt->getThen()) && dyn_cast<clang::CompoundStmt>(ifStmt->getThen())->body().empty() ||
-			ifStmt->getElse() && isa<clang::CompoundStmt>(ifStmt->getElse()) && dyn_cast<clang::CompoundStmt>(ifStmt->getElse())->body().empty())
-		{
-			Logger::warn("Empty IfStmt both branches - replace it with undefined stmt");
-			return new ControlFlowDomainUndefinedStmtNode(stmt);
-		}
-
 		Logger::info("Found IfStmt");
 		auto currentIf = ifStmt;
 		vector<ControlFlowDomainIfStmtPart*> ifParts;
@@ -84,13 +71,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 		return new ControlFlowDomainIfStmtNode(ifParts, _else);
 	}
 	if (auto whileStmt = dyn_cast<clang::WhileStmt>(stmt))
-	{		
-		if (!whileStmt->getBody() || isa<clang::CompoundStmt>(whileStmt->getBody()) && dyn_cast<clang::CompoundStmt>(whileStmt->getBody())->body().empty())
-		{
-			Logger::warn("Empty WhileStmt body - replace it with udefined stmt");
-			return new ControlFlowDomainUndefinedStmtNode(stmt);
-		}
-
+	{	
 		Logger::info("Found WhileStmt");
 		auto expr = mapExprToControlflowDst(whileStmt->getCond());
 		auto body = mapToControlflowDst(whileStmt->getBody(), astCtx);
@@ -100,12 +81,6 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	}
 	if (auto doStmt = dyn_cast<clang::DoStmt>(stmt))
 	{
-		if (!doStmt->getBody() || isa<clang::CompoundStmt>(doStmt->getBody()) && dyn_cast<clang::CompoundStmt>(doStmt->getBody())->body().empty())
-		{
-			Logger::warn("Empty DoStmt body - replace it with udefined stmt");
-			return new ControlFlowDomainUndefinedStmtNode(stmt);
-		}
-
 		Logger::info("Found DoStmt");
 		auto expr = mapExprToControlflowDst(doStmt->getCond());
 		auto body = mapToControlflowDst(doStmt->getBody(), astCtx);
@@ -350,6 +325,11 @@ ControlFlowDomainStmtRdfNode* mapExprToRdfStmtNode(ControlFlowDomainExprStmtNode
 	return new ControlFlowDomainStmtRdfNode(++idGenerator, getAstRawString(node->getAstNode(), mgr));
 }
 
+ControlFlowDomainStmtRdfNode* createUndefinedRdfNodeStmt(int& idGenerator)
+{
+	return new ControlFlowDomainStmtRdfNode(++idGenerator, "int temp_var_" + to_string(idGenerator) + " = 0;");
+}
+
 
 ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, int& idGenerator, clang::SourceManager& mgr, ASTContext& astCtx, bool forceToSeq = false)
 {	
@@ -361,7 +341,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 	if (auto castedNode = dynamic_cast<ControlFlowDomainUndefinedStmtNode*>(node))
 	{
 		// TODO validate that
-		auto val = new ControlFlowDomainStmtRdfNode(++idGenerator, "int temp_var_" + to_string(idGenerator) + " = 0;");
+		auto val = createUndefinedRdfNodeStmt(idGenerator);
 		if (forceToSeq)
 		{
 			vector<ControlFlowDomainLinkedRdfNode*> body;
@@ -399,22 +379,25 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			body.push_back(current);
 			prev = current;
 		}
+		
 		if (undefinedStmtIdx.size() > 0 && undefinedStmtIdx.size() < body.size())
 		{
+			std::reverse(undefinedStmtIdx.begin(), undefinedStmtIdx.end());
 			for (int i = 0; i < undefinedStmtIdx.size(); ++i) {
 				auto val = body[undefinedStmtIdx[i]];
 				body.erase(body.begin() + undefinedStmtIdx[i]);
 				delete val;
 			}
 		}
-		if (body.size() > 1 && undefinedStmtIdx.size() == body.size())
+		else if (body.size() > 1 && undefinedStmtIdx.size() == body.size())
 		{
-			for (int i = 0; i < undefinedStmtIdx.size() - 1; ++i) {
-				auto val = body[undefinedStmtIdx[i]];
-				body.erase(body.begin() + undefinedStmtIdx[i]);
+			for (int i = 0, iters = body.size() - 1; i < iters; ++i) {
+				auto val = body[body.size() - 1];
+				body.pop_back();
 				delete val;
 			}
 		}
+
 		if (body.size() > 0)
 		{
 			body[0]->setFirst();
@@ -453,6 +436,12 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 			if (!seq)
 				return NULL;
 
+			if (seq->getBody().size() == 0) 
+			{
+				Logger::info("Found empty else body - add undefined action");
+				seq->getBody().push_back(createUndefinedRdfNodeStmt(idGenerator));
+			}
+
 			auto expr = mapExprToRdfExprNode(ifParts[i]->getExpr(), idGenerator, mgr);
 			ControlFlowDomainAlternativeBranchRdfNode* branchNode = (i == 0)
 				? (ControlFlowDomainAlternativeBranchRdfNode*)new ControlFlowDomainAlternativeIfBranchRdfNode(++idGenerator, expr, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()))
@@ -470,6 +459,12 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 		if (castedNode->getElseBody() && castedNode->getElseBody()->getAstNode())
 		{
 			auto seq = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getElseBody(), idGenerator, mgr, astCtx, true);
+			if (seq->getBody().size() == 0)
+			{
+				Logger::info("Found empty else body - add undefined action");
+				seq->getBody().push_back(createUndefinedRdfNodeStmt(idGenerator));
+			}
+
 			auto branchNode = new ControlFlowDomainAlternativeElseBranchRdfNode(++idGenerator, vector<ControlFlowDomainLinkedRdfNode*>(seq->getBody()));
 			prevBranchNode->setNext(branchNode);
 			branchNode->setIndex(i);
@@ -490,12 +485,24 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 	{
 		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
+		if (bodyRdf->getBody().size() == 0)
+		{
+			Logger::info("Found empty cycle body - add undefined action");
+			bodyRdf->getBody().push_back(createUndefinedRdfNodeStmt(idGenerator));
+		}
+
 		return new ControlFlowDomainWhileDoRdfNode(++idGenerator, castedNode->getComplexity(), exprRdf, bodyRdf);
 	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainDoWhileStmtNode*>(node))
 	{
 		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
+		if (bodyRdf->getBody().size() == 0)
+		{
+			Logger::info("Found empty cycle body - add undefined action");
+			bodyRdf->getBody().push_back(createUndefinedRdfNodeStmt(idGenerator));
+		}
+
 		return new ControlFlowDomainDoWhileRdfNode(++idGenerator, castedNode->getComplexity(), exprRdf, bodyRdf);
 	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainForStmtNode*>(node))
@@ -504,6 +511,12 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 		auto exprRdf = mapExprToRdfExprNode(castedNode->getExpr(), idGenerator, mgr);
 		auto incRdf = mapExprToRdfStmtNode(castedNode->getInc(), idGenerator, mgr);
 		auto bodyRdf = (ControlFlowDomainSequenceRdfNode*)mapToRdfNode(castedNode->getBody(), idGenerator, mgr, astCtx, true);
+		if (bodyRdf->getBody().size() == 0)
+		{
+			Logger::info("Found empty cycle body - add undefined action");
+			bodyRdf->getBody().push_back(createUndefinedRdfNodeStmt(idGenerator));
+		}
+
 		return new ControlFlowDomainForRdfNode(++idGenerator, castedNode->getComplexity(), initRdf, exprRdf, incRdf, bodyRdf);
 	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainReturnStmtNode*>(node))

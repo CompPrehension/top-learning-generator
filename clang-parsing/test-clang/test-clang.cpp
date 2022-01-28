@@ -31,6 +31,8 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...\n");
 
+static string GlobalOutputPath = "";
+
 
 class ExprPrinter : public MatchFinder::MatchCallback {
 public:
@@ -103,7 +105,7 @@ private:
         ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
         string functionName;
         string shortFilename = "";
-        string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\cntrflowoutput\\";
+        string outputDir = GlobalOutputPath;
         string logsDir = outputDir;
         bool isSuccess = false;
 
@@ -188,6 +190,9 @@ private:
 
 
 int main(int argc, const char** argv) {
+
+    GlobalOutputPath = string(argv[argc - 1]);
+
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
     if (!ExpectedParser) {
         // Fail gracefully for unsupported options.
@@ -216,7 +221,6 @@ int main(int argc, const char** argv) {
     ).bind("exressionDomain");
     auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
         .bind("cntrlflowDomain");
-
 
     ExprPrinter Printer;
     MatchFinder Finder;

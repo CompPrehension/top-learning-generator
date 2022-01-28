@@ -426,7 +426,7 @@ public:
 			// ensure last expression is increment
 			auto incExpressionAstNode = dyn_cast<Expr>(this->getInc()->getAstNode())->IgnoreImplicit()->IgnoreImplicitAsWritten()->IgnoreImpCasts()->IgnoreParens();
 			auto incExpression = dyn_cast<UnaryOperator>(incExpressionAstNode);
-			if (incExpression->getOpcode() != UnaryOperatorKind::UO_PostInc && incExpression->getOpcode() != UnaryOperatorKind::UO_PreInc) {
+			if (!incExpression || incExpression->getOpcode() != UnaryOperatorKind::UO_PostInc && incExpression->getOpcode() != UnaryOperatorKind::UO_PreInc) {
 				Logger::info("Last expression isn't increment");
 				goto constant_iteration_check_end;
 			}
