@@ -18,6 +18,9 @@ from ns4guestions import *
 from rdflib_utils import graph_lookup, pretty_rdf
 
 
+from fix_alg_names import fix_names_in_graph
+
+
 COLLECTION_TYPES = (list, tuple, set)  # if default param in GView.get(..., default=...) is one of this types (or a type itself) then list of values instead of single value
 
 
@@ -185,6 +188,8 @@ def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 	array.sort(key=cmp_to_key(next_prop * '+'))  # transitive property Path
 	return array
 
+# using output of ctrlstrct_run helper
+LEAF_ACTION_CLASSES = [s for s in (['algorithm', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop', 'stmt', 'else', 'infinite_loop', 'alternative', 'foreach_loop', 'ntimes_loop', 'func', 'if', 'expr'] + ['sequence', 'boundary'])]
 
 class AlgorithmGraphWalker(GView):
 	# def __init__(self, g: Graph, subject: URIRef, gl: graph_lookup=None):
@@ -197,7 +202,7 @@ class AlgorithmGraphWalker(GView):
 		d = {}
 		_visited_nodes[self] = d  # assign a reference
 		for k, values in self.items():
-			if k in (':next', ):  # skip some properties
+			if k in (':next', ':parent_of', ':has_upcoming', ':hasPartTransitive', ':consequent', ':always_consequent', ':on_false_consequent', ':on_true_consequent'):  # skip some properties
 				continue
 			### k = remove_ns_prefix(k)
 			if k.endswith('_item'):
@@ -206,13 +211,23 @@ class AlgorithmGraphWalker(GView):
 			for i, value in enumerate(values):
 				if isinstance(value, URIRef):
 					values[i] = value.n3(self.g.namespace_manager)
-					if values[i] in ('owl:NamedIndividual', ':first_item', ':last_item', ':linked_list'):  # hide this nodes as objects
+					# if k in ('rdf:type', ) and values[i] not in LEAF_ACTION_CLASSES: # handle types
+					# 		### print('\tDrop OUT type::::', values[i])
+					# 		values[i] = None
+					if values[i] in ('owl:NamedIndividual', 'owl:Thing', 'Concept', ':first_item', ':last_item', ':linked_list',
+						# ':action', ':loop', ':start_with_cond', ':conditional_loop', ':conditional_loop', ':body_then_cond', ':cond_then_body', ':start_with_init', ':pre_update_loop', ':post_update_loop',
+						):  # hide this nodes as objects
 						values[i] = None
 					else:
 						values[i] = remove_ns_prefix(values[i])
 				if isinstance(value, AlgorithmGraphWalker):
 					values[i] = value.to_algorithm_json(_visited_nodes)
 			values = list(filter(lambda x: x is not None, values))
+			if k in ('rdf:type', ) and len(values) > 1:  # handle types
+				values = [n for n in LEAF_ACTION_CLASSES if n in values][:1]
+			if not values:
+				print('Empty values for key:::', k)
+				continue
 			is_collection = len(values) > 1 or k.endswith('_item')
 			val = list(values) if is_collection else values[0]
 			### if not k.endswith('stmt_name') and type(val) not in (dict, list): continue
@@ -290,13 +305,27 @@ def find_subject_of_type(g, class_uri):
 def change_ext(filepath, target_ext='.json'):
 	return os.path.splitext(filepath)[0] + target_ext
 
+def graph_2_json(g, root_class=NS_code.get('algorithm')):
+	algorithm = find_subject_of_type(g, root_class)
+	w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
+
+	# 1. FIX names
+	fix_names_in_graph(g, w.gl, fix_complex_names=False)
+
+	# 2. REMOVE some statements
+	shrink_linear_stmts(g, w.gl)
+
+	# 3. EXPORT to algorithm_json
+	a_json = w.to_algorithm_json()
+	return a_json
+
+
 
 def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\cntrflowoutput_v4_json', ext_pattern='*.ttl'):
 	'convert all .ttl files in DIR_SRC to "algorithm" *.json into DEST_DIR'
 	from glob import glob
 	import json
 
-	from fix_alg_names import fix_names_in_graph
 
 	FORMAT_IN = "turtle"
 
@@ -313,17 +342,18 @@ def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\
 
 		g = read_rdf(fp, rdf_format=FORMAT_IN)
 
-		algorithm = find_subject_of_type(g, root_class)
-		w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
+		a_json = graph_2_json(g, root_class)
+			# algorithm = find_subject_of_type(g, root_class)
+			# w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
 
-		# 1. FIX names
-		fix_names_in_graph(g, w.gl, fix_complex_names=False)
+			# # 1. FIX names
+			# fix_names_in_graph(g, w.gl, fix_complex_names=False)
 
-		# 2. REMOVE some statements
-		shrink_linear_stmts(g, w.gl)
+			# # 2. REMOVE some statements
+			# shrink_linear_stmts(g, w.gl)
 
-		# 3. EXPORT to algorithm_json
-		a_json = w.to_algorithm_json()
+			# # 3. EXPORT to algorithm_json
+			# a_json = w.to_algorithm_json()
 
 		out = change_ext(
 			os.path.join(

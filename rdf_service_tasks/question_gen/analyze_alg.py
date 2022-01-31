@@ -1,19 +1,33 @@
 # analyze_alg.py
 
 from collections import defaultdict
-from functools import reduce
-from itertools import product, starmap
-from operator import add, eq
+from functools import reduce, lru_cache
+from itertools import repeat, product, starmap
+from operator import add, eq, or_
 from random import shuffle
 
 import rdflib
 from rdflib import Graph, RDF
 
 from ns4guestions import *
-from rdflib_utils import pretty_rdf
+from rdflib_utils import graph_lookup, pretty_rdf, TripleOverrider
 
 
 LOOP_MAX_ITERATIONS = 3
+
+
+_INTERRUPT_BY_TIMEOUT = False
+
+def set_interrupt_flag(value:bool=False):
+    global _INTERRUPT_BY_TIMEOUT
+    if _INTERRUPT_BY_TIMEOUT != value:
+        print('setting INTERRUPT_BY_TIMEOUT to', value)
+    _INTERRUPT_BY_TIMEOUT = value
+
+def check_interrupt():
+    if _INTERRUPT_BY_TIMEOUT:
+        print('Stopping by timeout ...')
+        raise StopIteration("Interrupted by timeout")
 
 
 
@@ -63,6 +77,17 @@ class expr_bool_values:  # `gen`
 # [itvs[i] for i in range(10)]
 # >>> [False, True, True, False, False, False, False, False, False, False]
 
+def logical_or(a, b):
+    return a or b
+
+# def bitwise_or(a, b):
+    # # return a | b
+    # ###
+    # print('About to OR:', a, "|", b)
+    # r = a | b
+    # print('Result of OR:', r)
+    # return r
+
 
 class Way(jsObj):
     '''
@@ -74,25 +99,78 @@ class Way(jsObj):
     }
     '''
     def __init__(self, *args, **kw):
+        check_interrupt()
         super().__init__(*args, **kw)
-        self.len  = self.get('len', 0)
+        self.len    = self.get('len', 0)
         self.depth  = self.get('depth', 0)
-        self.vals = self.get('vals', None) or jsObj()
-        self.acts = self.get('acts', None) or ()
-    @staticmethod
+        self.vals   = self.get('vals', None) or jsObj()
+        self.acts   = self.get('acts', None) or ()
+        self.reasons = self.get('reasons', None)  # frozenset()
+        self.possible_violations = self.get('possible_violations', None)  # frozenset()
+        self.invalid = self.get('invalid', False)
+        self.updates = self.get('updates', None)  # : dict(action_id -> update_dict)
+        self.key2join = dict(self._key2join)  # copy from static declaration
+        self.key2join['updates'].func = self.join_updates
+    # not a @staticmethod - just a function declared here :)
     def join_acts(a1, a2):
         if a1 and a2 and a1[-1] == a2[0]:
             a2 = a2[1:]
         return a1 + a2
+    # not a @staticmethod - just a function declared here :)
+    def join_vals(v1, v2):
+        return {cnd: v1.get(cnd, ()) + v2.get(cnd, ())
+                for cnd in set([*v1.keys(), *v2.keys()])}
+    def join_updates(self, u1:dict, u2:dict):
+        if not u1 and not u2: return None
+        if not u1 and u2: return u2
+        if u1 and not u2: return u1
+        k1 = set(u1.keys())
+        k2 = set(u2.keys())
+        common_k = k1 & k2
+        for ck in common_k:
+            if u1[ck].incompatible_with(u2[ck]):
+                print('incompatible_with way:')
+                print('\t1.:', u1)
+                print('\t2.:', u2)
+                self.invalid = True
+                return None
+
+        return {**u1, **u2}
+
+
+    # static var
+    _key2join = {
+        'len': jsObj(func=add, new=int),
+        'depth': jsObj(func=max, new=int),
+        'vals': jsObj(func=join_vals, new=jsObj),
+        'acts': jsObj(func=join_acts, new=tuple),
+        'reasons':             jsObj(func=or_, new=frozenset),
+        'possible_violations': jsObj(func=or_, new=frozenset),
+        'updates': jsObj(func=None or join_updates, new=dict),
+        # 'invalid' should be after 'updates'
+        'invalid': jsObj(func=logical_or, new=bool),  # or_ is "|" and can be used instead of "_ or _" for bools
+    }
     def __add__(self, other):
-        return Way({'len': self.len + other.len,
-         'depth': max(self.depth, other.depth),  # depth does not sum
-         'vals': {cnd: self.vals.get(cnd, ()) + other.vals.get(cnd, ())
-                  for cnd in set([*self.vals.keys(), *other.vals.keys()])},
-         'acts': self.join_acts(self.acts, other.acts),
-         'reasons': self.get('reasons', frozenset()) | other.get('reasons', frozenset()),
-         'possible_violations': self.get('possible_violations', frozenset()) | other.get('possible_violations', frozenset()),
-        })
+        r = Way()  # {}
+        for key, join in self.key2join.items():
+            r[key] = join.func(
+                # self .get(key, join.new()),
+                # other.get(key, join.new())
+                self .get(key) or join.new(),
+                other.get(key) or join.new()
+            )
+        ### print('joined ways data:'); print(r)
+        return r  # Way(r)
+
+    # def old__add__(self, other):
+    #     return Way({'len': self.len + other.len,
+    #      'depth': max(self.depth, other.depth),  # depth does not sum
+    #      'vals': {cnd: self.vals.get(cnd, ()) + other.vals.get(cnd, ())
+    #               for cnd in set([*self.vals.keys(), *other.vals.keys()])},
+    #      'acts': self.join_acts(self.acts, other.acts),
+    #      'reasons': self.get('reasons', frozenset()) | other.get('reasons', frozenset()),
+    #      'possible_violations': self.get('possible_violations', frozenset()) | other.get('possible_violations', frozenset()),
+    #     })
 
 # >>> w = Way()
 # >>> w += Way()
@@ -106,6 +184,7 @@ class Way(jsObj):
 
 
 def way_from_transition(bound1, value_gen=None, g=None, gl=None) -> (Way, rdflib.term.Identifier):
+    check_interrupt()
     way = Way()
     prop_name=':always_consequent'
     bnd2 = g.value(bound1, gl(prop_name), None)
@@ -145,7 +224,9 @@ def way_from_transition(bound1, value_gen=None, g=None, gl=None) -> (Way, rdflib
         way.possible_violations = frozenset(
             map(NS_code.localize, g.objects(R, gl(':possible_violation')))
         )
-    way.len = 1
+    # else:
+    #     print('No reason node for boundaries: %s, %s' % (bound1, bnd2))
+    way.len = 1 if R else 0  # do not count hidden transitions
     way.depth = 1
     way.acts = (bound1, bnd2)
     return (way, bnd2)
@@ -156,10 +237,13 @@ def combine_ways_parts(way_parts: list):
 
 
 def nontrivial_ways(ways: list, max_similar=2, length_ratio=0.34, print_report=True):
+    check_interrupt()
     # traces with same violations
     groups = defaultdict(list)
 
     for way in ways:
+        if way.invalid:
+            continue
         viols = way.possible_violations
         ## print(viols)
         groups[viols].append(way)
@@ -188,9 +272,49 @@ def nontrivial_ways(ways: list, max_similar=2, length_ratio=0.34, print_report=T
     return selected_trace_configs
 
 
+def _make_updates_for_FOR_loop(st:rdflib.term.URIRef, lower_bound:int, upper_bound:int, g,gl) -> dict:
+    # describe what to replace in Graph's triples to obtain specified bounds:
+    # update loop header by inserting appropriate values into init and cond clauses
+    # updates to Way properties
+    updates = {}
+
+    # deal with `init`
+    init_node = g.value(st, gl(':init'), None)
+    if not init_node:
+        print('[WARN] Cannon change `init` clause as it doesn`t exist in FOR loop (%s)' % pretty_rdf(st)) # raise ValueError
+        return updates
+    init = g.value(init_node, gl(':stmt_name'), None).toPython()
+    assert init
+    lvalue = init.partition('=')[0]
+    new_init = '%s = %d' % (lvalue.strip(), lower_bound)
+    tor = TripleOverrider((init_node, gl(':stmt_name'), rdflib.term.Literal(init)),
+                           o=rdflib.term.Literal(new_init))
+    node_id = g.value(init_node, gl(':id'), None).toPython()
+    updates[node_id] = tor
+
+    # deal with `cond`
+    cond_node = g.value(st, gl(':cond'), None)
+    if not cond_node:
+        print('[WARN] Cannon change `cond` clause as it doesn`t exist in FOR loop (%s)' % pretty_rdf(st)) # raise ValueError
+        return updates
+    cond = g.value(cond_node, gl(':stmt_name'), None).toPython()
+    assert cond
+    op = '<=' if '<=' in cond else '<'  # !!! only two cmp operations supported so far!
+    lvalue = cond.partition(op)[0]
+    new_cond = '%s %s %d' % (lvalue.strip(), op, upper_bound)
+    tor = TripleOverrider((cond_node, gl(':stmt_name'), rdflib.term.Literal(cond)),
+                          o=rdflib.term.Literal(new_cond))
+    node_id = g.value(cond_node, gl(':id'), None).toPython()
+    updates[node_id] = tor
+
+    return updates
+
+
+@lru_cache()
 def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
     ''' -> [way1, way2, ...]
     '''
+    check_interrupt()
     gl = gl or graph_lookup(g)
     ways = list()
 
@@ -210,23 +334,74 @@ def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
 
 
     if (st, RDF.type, gl(':loop')) in g:
+        additional_way_params = repeat(None)  # nothing by default (can be something with FOR loops)
         safe_value = False  # what to use in condition to aviod an infinite loop
         if (st, RDF.type, gl(':inverse_conditional_loop')) in g:  ### TODO: make sure of loop type
             safe_value = True
         is_post_conditional = (st, RDF.type, gl(':start_with_body')) in g
-        tactics = [(0, i, safe_value) for i in range(LOOP_MAX_ITERATIONS + 1 - int(is_post_conditional))]
+        loop_complexity = g.value(st, gl(':loop_complexity'), None)
+        # default unlimited count of iterations:
+        min_iterations = 0
+        max_iterations = LOOP_MAX_ITERATIONS - int(is_post_conditional)
+        if loop_complexity:
+            loop_complexity = loop_complexity.toPython()
+            assert type(loop_complexity) is str, '`loop_complexity`: `str` type expected'
+            if loop_complexity == "InfiniteTimes":
+                # we cannot control number of iteratons
+                print('[WARN] Cannot trace loop with loop_complexity: "%s": we cannot control number of iteratons' % loop_complexity)
+                return ways  # empty fo far
+            elif loop_complexity == "ZeroTimes":
+                max_iterations = 0
+            elif loop_complexity == "NonZeroTimes":
+                min_iterations = 1
+            elif loop_complexity.startswith("NTimes"):
+                s = loop_complexity[len("NTimes"):].strip().lstrip('[')
+                not_inclusive = s.endswith(')')  # otherwise ']'
+                s = s.rstrip(']').rstrip(')')
+                numbers = [int(n.strip()) for n in s.split(',')]
+                assert len(numbers) == 2, '"%s" -> %s' % (s, numbers)
+                a, b = numbers
+                print('NTimes: ', a,b, ' not_inclusive:', not_inclusive)
+                number_of_iterations = b - a + 1 - not_inclusive # defined by Ntimes loop setting
+                if number_of_iterations <= max_iterations:
+                    # fixed variant according to code given
+                    min_iterations = number_of_iterations
+                    max_iterations = number_of_iterations
+                    print('NTimes: use count as provided: ', number_of_iterations)
+                else:
+                    # update loop header by inserting appropriate values:
+                    additional_way_params = [
+                        _make_updates_for_FOR_loop(st, a, a + i - 1 + not_inclusive, g,gl)
+                        for i in range(min_iterations, max_iterations + 1)
+                    ]
+                    print('NTimes: change count as we need: ', additional_way_params)
+                    pass
+
+            elif loop_complexity == "Undefined":
+                pass  # anything possible
+            else:
+                raise ValueError('Unknown value of `loop_complexity`: "%s"' % loop_complexity)
+        # (delay=0, active=i, )
+        tactics = [(0, i, safe_value, a_w_par)
+            for i, a_w_par in zip(
+                range(min_iterations, max_iterations + 1),
+                additional_way_params)]
 
     elif (st, RDF.type, gl(':alternative')) in g:
         branch_count = len([*g.objects(st, gl(':branches_item'))])
-        tactics = [(i, 1) for i in range(branch_count + 1)]
+        tactics = [(i, 1, False, None) for i in range(branch_count + 1)]  # possible overhead for `else` will be optimized by nontrivial_ways()
 
     # if (st, RDF.type, gl(':sequence')) in g:
     else:
-        tactics = [(0,)]  # just ensure one iteration; value_gen won't be used
+        tactics = [(0,0,False, None)]  # just ensure one iteration; value_generator won't be used
 
     for gen_params in tactics:
-        value_gen = expr_bool_values(*gen_params)
-        way_parts = [[Way()]]
+        value_gen = expr_bool_values(*gen_params[:3])
+        additional_way_updates = gen_params[3]
+        if additional_way_updates: print('````` additional_way_updates =`', additional_way_updates)
+        way_parts = [[Way(
+                updates = additional_way_updates
+            )]]
         bnd_begin = g.value(None, gl(':begin_of'), st)
         bnd_end   = g.value(None, gl(':end_of'), st)
         bound = bnd_begin
@@ -250,10 +425,13 @@ def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
         # collapse excessive ways
         ways += nontrivial_ways(curr_ways_through)
 
+    ### if not ways: print('\t!! No ways through ', st)
     return ways
 
 
 def makeQuestionGraph(way: Way, g, gl):
+
+    assert not way.invalid, way.invalid
 
     # make a resulting question graph
     qg = Graph()
@@ -306,6 +484,13 @@ def makeQuestionGraph(way: Way, g, gl):
         prev_act = act
         prev_phase = phase_mark
 
+    if way.updates:
+        for trov in way.updates.values():
+            print('\t\tWriting updates ...')
+            print('\t\t', trov)
+            print()
+            trov.write_as_triples(qg)
+
     return qg, cond_values, act_index
 
 
@@ -330,6 +515,8 @@ def generate_questions_for_algorithm(g, gl):
             possible_violations=way.possible_violations,
             rdf=graph,
         ))
+
+    ### print('### generate_questions_for_algorithm() ->', len(questions), 'questions.')
 
     return questions
 

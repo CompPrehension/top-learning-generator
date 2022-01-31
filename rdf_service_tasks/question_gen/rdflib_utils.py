@@ -1,10 +1,12 @@
 # rdflib_utils.py
 
 import functools
+import itertools
 import re
 
 import rdflib
-from rdflib import Graph
+from rdflib import Graph, RDF
+from rdflib.term import URIRef, Literal
 
 # using patched version of SPARQLBurger
 from SPARQLBurger.SPARQLQueryBuilder import *
@@ -18,6 +20,90 @@ from chain_utils import builder
 #     rdfs= "http://www.w3.org/2000/01/rdf-schema#",
 #     owl = "http://www.w3.org/2002/07/owl#",
 # )
+
+
+class TripleOverrider:
+	def __init__(self, triple:tuple, s=None, p=None, o=None, self_node=None):
+		self.triple = triple
+		self.s = s
+		self.p = p
+		self.o = o
+		self.self_node = self_node
+	def __str__(self): return f'<TripleOverrider {repr(self.triple)}, ==>> ({self.s}, {self.p}, {self.o})>'
+	__repr__ = __str__
+	@staticmethod
+	def rdf_class_uri(ns:NamespaceUtil=NS_oop):
+		return ns.get('TripleOverrider')
+	@classmethod
+	def rdf_class_UriRef(cls, ns:NamespaceUtil=NS_oop):
+		return URIRef(cls.rdf_class_uri(ns))
+	def adds(self) -> bool:
+		'otherwise removes old triple only'
+		return any([self.s, self.p, self.o])
+	def new_triple(self):
+		return ((
+					self.s or self.triple[0],
+					self.p or self.triple[1],
+					self.o or self.triple[2],
+				)
+				if self.adds() else None)
+	def __eq__(self, other):
+		return (isinstance(other, TripleOverrider)
+			and self.triple == other.triple
+			and self.s == other.s
+			and self.p == other.p
+			and self.o == other.o)
+	def __ne__(self, other): return not self.__eq__(other)
+	def incompatible_with(self, other):
+		return (isinstance(other, TripleOverrider)
+			and self.triple == other.triple
+			and (	self.s != other.s
+				 or self.p != other.p
+				 or self.o != other.o))
+	def write_as_triples(self, g:Graph):
+		g.bind('oop', NS_oop.get())
+		for i in itertools.count():
+			subj = URIRef(self.rdf_class_uri() + '#%d' % i)
+			if (subj, None, None) not in g:
+				break
+		g.add((subj, RDF.type,  self.rdf_class_UriRef()))
+		g.add((subj, URIRef(NS_oop.get('old_subject')),   self.triple[0]))
+		g.add((subj, URIRef(NS_oop.get('old_predicate')), self.triple[1]))
+		g.add((subj, URIRef(NS_oop.get('old_object')),    self.triple[2]))
+		if self.s:
+			g.add((subj, URIRef(NS_oop.get('new_subject')),   self.s))
+		if self.p:
+			g.add((subj, URIRef(NS_oop.get('new_predicate')), self.p))
+		if self.o:
+			g.add((subj, URIRef(NS_oop.get('new_object')),    self.o))
+	@classmethod
+	def create_from_graph(cls, tor_node:URIRef, g:Graph):
+		return TripleOverrider(
+			triple=(
+				g.value(tor_node, URIRef(NS_oop.get('old_subject')), None),
+				g.value(tor_node, URIRef(NS_oop.get('old_predicate')), None),
+				g.value(tor_node, URIRef(NS_oop.get('old_object')), None),
+			),
+			s=g.value(tor_node, URIRef(NS_oop.get('new_subject')), None),
+			p=g.value(tor_node, URIRef(NS_oop.get('new_predicate')), None),
+			o=g.value(tor_node, URIRef(NS_oop.get('new_object')), None),
+			self_node=tor_node,
+		)
+
+	def apply_on_graph(self, g:Graph, remove_self=True):
+		if not self.s and not self.p and self.o:
+			g.set((*self.triple[:2], self.o))
+		else:
+			if all(self.triple):  # avoid deleting patterns with 'None's
+				g.remove(self.triple)
+			new_triple = self.new_triple()
+			if new_triple and all(new_triple):
+				g.add(new_triple)
+		if remove_self and self.self_node:
+			# remove all triples about this TripleOverrider
+			g.remove((self.self_node, None, None))
+
+
 
 
 

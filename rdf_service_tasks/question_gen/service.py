@@ -14,7 +14,7 @@ import rdflib
 from rdflib import Graph, RDF
 import yaml
 
-from analyze_alg import generate_questions_for_algorithm
+from analyze_alg import generate_questions_for_algorithm, set_interrupt_flag
 from chain_utils import builder
 from GraphRole import GraphRole
 from NamespaceUtil import NamespaceUtil
@@ -240,7 +240,10 @@ def fetchGraph(gUri: str):
 
 # q_graph = fetchGraph(NS_questions.base())
 if INIT_GLOBALS:
-    qG = fetchGraph(NS_questions.base())
+    ### empty graph:
+    qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
+    # pre-download whole questions graph
+    # qG = fetchGraph(NS_questions.base())
 
 
 
@@ -475,76 +478,134 @@ def question_metrics(g, gl, question_dict, quiet=False):
         has_violation = tuple(sorted(question_dict['possible_violations'])),
     )
 
+import threading
+import time
+CREATE_TRACES_TIMEOUT = 15  # seconds
 
-def generate_questions_for_templates(limit=None):
 
-    templates_to_create_questions = templatesWithoutQuestions()
+def process_template(qtname, questions_count=0):
+    g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
+    gl = graph_lookup(g, PREFIXES)
+
+    # old code: just call it
+    # questions = generate_questions_for_algorithm(g, gl)
+
+    # new code: kill process on timeout
+    questions = None ## ()  # nothing by default
+
+    def process_one(g, gl):
+        nonlocal questions
+        questions = generate_questions_for_algorithm(g, gl)
+
+    t = threading.Thread(target=process_one, args=(g, gl))
+    set_interrupt_flag(False)
+    t.start()
+        # Wait for at most 30 seconds for the thread to complete.
+    t.join(CREATE_TRACES_TIMEOUT)
+    set_interrupt_flag(True)
+        # Now join without a timeout knowing that the thread is either already
+        # finished or will finish "soon".
+    t.join()
+
+    # [{'name_suffix': '000',
+        #     'length': 18,
+        #     'depth': 7,        # < TODO
+        #     'laws': frozenset({'AltBegin',
+        #                'AltEndAllFalse',
+        #                'SequenceBegin',
+        #                'SequenceEnd',
+        #                'SequenceNext'}),
+        #     'possible_violations': frozenset({'DuplicateOfAct',
+        #                'LastFalseNoEnd',
+        #                'NoFirstCondition',
+        #                'SequenceFinishedTooEarly',
+        #                'TooEarlyInSequence'}),
+        #     'rdf': <Graph>}]
+
+    print("Total questions generated: ", questions and len(questions))
+
+    if not questions:
+        return 0
+
+    for question in questions:
+        print()
+        suffix = question['name_suffix'] or ('_nocond_q%d' % questions_count)
+        question_name = '%s_v%s' % (qtname, suffix)
+        file_path = nameForQuestionGraph(question_name, GraphRole.QUESTION)
+        assert file_path, question_name
+        print("  Saving question: ", question_name, ' --> ', file_path)
+        ### continue
+
+        #### gUri = NS_file.get(GraphRole.QUESTION.ns().get(file_path))
+        gUri = NS_file.get(file_path)
+        model = question['rdf']
+        print("    Uploading model ...")  # "for question '%s' ... " % question_name)
+        # uploadGraph(gUri, model, fuseki_update)
+        for _i in range(3):
+            try:
+                if _i > 0: print("       [NETWORK] Retry uploading model: take %d" % _i)
+                fileService.sendModel(file_path, model);
+                break
+            except:
+                continue
+
+        qUri = createQuestion(question_name, qtname, gUri, question_metrics(g, gl, question))
+        print("  Question URI:", qUri)
+
+    return len(questions)
+
+
+
+def generate_questions_for_templates(offset=None, limit=None):
+
+    print("Requesting templates without questions ...", flush=True)
+    if limit:
+        sparql_limit = limit
+        limit = None
+    else:
+        sparql_limit = None
+    templates_to_create_questions = templatesWithoutQuestions(sparql_limit)
 
     ### debugging: get existing questions instead
     # templates_to_create_questions = list({n[:n.rfind("_v")] for n in unsolvedQuestions(GraphRole.QUESTION_SOLVED)})
 
 
     print('Templates without questions found: %d' % len(templates_to_create_questions))
+    ### return
 
     # print(*templates_to_create_questions, sep='\n')
     # exit()
 
     questions_count = 0
+    skip_count = 0
 
-    for qtname in templates_to_create_questions[:limit]:
+    # def process_one(qtname):
+    #     nonlocal questions_count
+    #     nonlocal skip_count
+    #     try:
+    #         questions_count += process_template(qtname, questions_count)
+    #     except NotImplementedError as e:
+    #         skip_count += 1
+    #         print()
+    #         print('Error with template: ', qtname)
+    #         print(e)
+
+
+    for qtname in templates_to_create_questions[offset:limit]:
 
         print()
         print()
         print("Processing template: ", qtname)
+        print("    (skipped so far: %d)" % skip_count)
         print("========")
-
-        g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
-
-        gl = graph_lookup(g, PREFIXES)
-
-        questions = generate_questions_for_algorithm(g, gl)
-        # [{'name_suffix': '000',
-            #     'length': 18,
-            #     'depth': 7,        # < TODO
-            #     'laws': frozenset({'AltBegin',
-            #                'AltEndAllFalse',
-            #                'SequenceBegin',
-            #                'SequenceEnd',
-            #                'SequenceNext'}),
-            #     'possible_violations': frozenset({'DuplicateOfAct',
-            #                'LastFalseNoEnd',
-            #                'NoFirstCondition',
-            #                'SequenceFinishedTooEarly',
-            #                'TooEarlyInSequence'}),
-            #     'rdf': <Graph>}]
-
-        print("Total questions generated: ", len(questions))
-
-        for question in questions:
+        try:
+            questions_count += process_template(qtname, questions_count)
+        except NotImplementedError as e:
+            skip_count += 1
             print()
-            suffix = question['name_suffix'] or ('_nocond_q%d' % questions_count)
-            question_name = '%s_v%s' % (qtname, suffix)
-            file_path = nameForQuestionGraph(question_name, GraphRole.QUESTION)
-            assert file_path, question_name
-            print("  Saving question: ", question_name, ' --> ', file_path)
-            ### continue
-
-            #### gUri = NS_file.get(GraphRole.QUESTION.ns().get(file_path))
-            gUri = NS_file.get(file_path)
-            model = question['rdf']
-            print("    Uploading model ...")  # "for question '%s' ... " % question_name)
-            # uploadGraph(gUri, model, fuseki_update)
-            for _i in range(3):
-                try:
-                    if _i > 0: print("       [NETWORK] Retry uploading model: take %d" % _i)
-                    fileService.sendModel(file_path, model);
-                    break
-                except:
-                    continue
-
-            qUri = createQuestion(question_name, qtname, gUri, question_metrics(g, gl, question))
-            print("  Question URI:", qUri)
-            questions_count += 1
+            print('Error with template: ', qtname)
+            print(e)
+            print()
 
 
     print()
