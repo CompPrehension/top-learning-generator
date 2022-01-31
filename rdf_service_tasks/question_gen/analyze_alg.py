@@ -19,8 +19,8 @@ LOOP_MAX_ITERATIONS = 3
 
 class jsObj(dict):
     'JS-object-like dict (access to "foo": obj.foo as well as obj["foo"])'
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
+    # def __init__(self, *args, **kw):
+    #     super().__init__(*args, **kw)
     __getattr__ = dict.__getitem__
     __setattr__ = dict.__setitem__
 
@@ -117,9 +117,11 @@ def way_from_transition(bound1, value_gen=None, g=None, gl=None) -> (Way, rdflib
             True:  ':on_true_consequent',
             False: ':on_false_consequent',
           }.get(value)
+        assert prop_name, 'generated value (bool expected): "%s"' % repr(value)
         bnd2 = g.value(bound1, gl(prop_name), None)
         if not bnd2:
-            raise NotImplementedError("3 types of '*consequent' transitions supported so far.")
+            print('No outgoing ', prop_name, ' found from node:', bound1)
+            raise NotImplementedError("No known outgoing '*consequent' transitions found.\n\t\t 3 types of '*consequent' transitions supported so far.")
 
         cond_node = g.value(bound1, gl(':boundary_of'), None)
         assert cond_node

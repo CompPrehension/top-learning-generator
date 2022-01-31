@@ -157,7 +157,12 @@ class GView:
 
 
 def remove_ns_prefix(s):
+	s = s.lstrip('<').rstrip('>')
+	if '//' in s:
+		pos = max(s.rfind('#'), s.rfind('/'))
+		return s[pos + 1:]
 	return s.partition(':')[2] or s  # `or`: if no prefix, partition[2] will be empty
+
 def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 	"Sort an arrays of AlgorithmGraphWalker instances according to (s)-->:next-->(o) relations"
 	def cmp_to_key(prop_name):
@@ -334,7 +339,7 @@ def ttl_2_json_batch(dir_src=r'c:\Temp2\cntrflowoutput_v4', dest_dir=r'c:\Temp2\
 
 if __name__ == '__main__':
 
-	if 1:
+	if 0:
 		import os.path
 		ttl_2_json_batch(dir_src=r'c:/Temp2/cntrflowoutput_v6', dest_dir=r'c:/Temp2/cntrflowoutput_v6_json')
 		exit(0)
@@ -348,7 +353,8 @@ if __name__ == '__main__':
 
 	# qg_path = r'c:\Temp2\cntrflowoutput_v4\1__memcpy_s__1639429224.ttl'
 	# qg_path = r'c:\Temp2\cntrflowoutput_v4\2__memmove_s__1639429224.ttl'
-	qg_path = r'c:\Temp2\cntrflowoutput_v4\28__avl_tree_insert__1639429224.ttl'
+	# qg_path = r'c:\Temp2\cntrflowoutput_v4\28__avl_tree_insert__1639429224.ttl'
+	qg_path = r'c:\Temp2\cntrflowoutput_v7\nk_style_from_table__4764473337220020718__1643441943.ttl'
 
 	g = Graph().parse(location=qg_path, format='turtle')
 
@@ -374,7 +380,7 @@ if __name__ == '__main__':
 	# export as pretty-formatted JSON
 
 	import json
-	out = r'../../../c_owl/code_gen/ctrlflow_v4_28-alg.json'
+	out = r'../../../c_owl/code_gen/nk_style_from_table.json'
 	with open(out, mode='w') as f:
 		data = json.dump(a_json, f, indent=2)
 

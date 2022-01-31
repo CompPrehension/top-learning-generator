@@ -79,9 +79,13 @@ class RemoteFileService:
         self.fs_upload   = open_fs(upload_base, create=False)
     def fetchModel(self, fullname) -> Graph:
         print('    fetchModel:', fullname)
-        stream = self.fs_download.openbin(fullname)
-        ttl = stream.read().decode()
-        return Graph().parse(format='n3', data=ttl)
+        try:
+	        stream = self.fs_download.openbin(fullname)
+	        ttl = stream.read().decode()
+	        return Graph().parse(format='n3', data=ttl)
+        except fs.errors.ResourceNotFound:
+	        print('              `-- not found')
+        	return None
     def sendModel(self, fullname, g: Graph):
         print('    sendModel:', fullname)
         self.fs_upload.makedirs(fs.path.split(fullname)[0], recreate=True)

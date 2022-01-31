@@ -175,7 +175,7 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
 
 
 
-def templatesWithoutQuestions() -> list:
+def templatesWithoutQuestions(limit=None) -> list:
     'get names of question templates without questions'
     ng = URI(NS_questions.base());
 
@@ -203,6 +203,9 @@ def templatesWithoutQuestions() -> list:
             ]).builder
         ).builder
     ).builder.get_text()
+
+    if limit and limit > 0:
+        lonelyTemplates += '\nLIMIT %d' % limit
 
     query_result = fuseki_query.run_sparql(lonelyTemplates, return_format="json")
     query_results = json.loads(b''.join(list(query_result)))
@@ -261,7 +264,7 @@ def questionStages():
 
 
 def findQuestionByName(questionName, questions_graph=qG, fileService=fileService):
-        qG = questions_graph or fileService.getGraph(NS_questions.base());
+        qG = questions_graph or fileService.fetchModel(NS_questions.base());
         if qG:
             qNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionName))
             if qNode:
@@ -552,4 +555,19 @@ def generate_questions_for_templates(limit=None):
 
 
 if __name__ == '__main__':
-    generate_questions_for_templates(30)
+    if 1:
+        generate_questions_for_templates(158, None) # 30
+        exit(0)
+
+    # qtname = 'packet_queue_get'
+    qtname = 'SDL_CondWaitTimeout'
+    print("========", flush=True)
+    questions_count = process_template(qtname)
+    print()
+    print(questions_count, 'questions created for template.')
+
+
+    '''
+    Templates without questions found: 24  (of 1 315)
+    [Finished in 39.5s]
+    '''

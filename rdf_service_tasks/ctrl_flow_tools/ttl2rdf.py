@@ -6,7 +6,8 @@ from rdflib import RDF
 
 SEARCH_PATTERN = '*.ttl'
 
-START_DIR = "c:/Temp2/cntrflowoutput_v4/"
+START_DIR = "c:/Temp2/cntrflowoutput_v7/"
+OUT_DIR = "c:/Temp2/cntrflowoutput_v7_rdf/"
 
 
 FORMAT_IN = "turtle"
@@ -21,12 +22,15 @@ INJECT_RDF = [
 	# r'c:/D/Work/YDev/CompPr/c_owl/jena/control-flow-statements-domain-schema.rdf',
 ]
 
+# !! keep list of actions up to date!
+RDF_CLASSES = 'action sequence expr stmt alternative if else-if else func func_call loop while_loop do_while_loop do_until_loop for_loop foreach_loop'.split()
+
 
 NS_CODE = 'http://vstu.ru/poas/code#'
 
 # !! keep list of actions up to date!
 action_classes = { rdflib.term.URIRef(NS_CODE + name)
-					for name in 'action sequence expr stmt alternative if else-if else func func_call loop while_loop do_while_loop do_until_loop for_loop foreach_loop'.split() }
+					for name in RDF_CLASSES }
 
 def patch(g):
 	# insert boundaries for actions
@@ -71,7 +75,10 @@ if __name__ == '__main__':
 
 
 	for fp in glob(START_DIR + SEARCH_PATTERN):
-		target_filepath = change_ext(fp)
+		target_filepath = change_ext(
+			os.path.join(
+				OUT_DIR,
+				os.path.split(fp)[1]))
 		if not OVERWRITE_ANYWAY and os.path.exists(target_filepath):
 			continue
 
@@ -89,3 +96,7 @@ if __name__ == '__main__':
 			# raise e
 
 	print("done.")
+	'''
+	done. - 21k
+	[Finished in 1499.9s]
+	'''
