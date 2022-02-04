@@ -52,10 +52,18 @@ def download_questions(offset=None, stop=None, step=None):
         # g.serialize(file_out, format=FORMAT_OUT)
 
 
+VALUE_HINT_LOCALIZED = {
+    True: dict(ru='истина', en='true'),
+    False: dict(ru='ложь', en='false'),
+    '1 iteration': dict(ru='итерация', en='iteration'),
+    '2,3,4 iterations': dict(ru='итерации', en='iterations'),
+    'iterations': dict(ru='итераций', en='iterations'),
+}
+
 def make_values_hint(values, is_loop=False, is_postcond=False):
     if not values:
         return ""
-    map_bool = {True: 'истина', False: 'ложь'}.get
+    map_bool = lambda key: VALUE_HINT_LOCALIZED.get(key).get(LOCALE)
     prefix = ''
     if not is_loop:
         prefix = '&#8594; '
@@ -64,11 +72,13 @@ def make_values_hint(values, is_loop=False, is_postcond=False):
         successes = len(values) - 1  ### sum(values) <= will fail for do-until loop
         count = successes + is_postcond
         if count == 1:
-            r = '1 итерация'
+            key = '1 iteration'
         elif count in (2,3,4):
-            r = '%d итерации' % count
+            key = '2,3,4 iterations'
         else:
-            r = '%d итераций' % count
+            key = 'iterations'
+        unit = VALUE_HINT_LOCALIZED.get(key).get(LOCALE)
+        r = '%d %s' % (count, unit)
     return prefix + ('<span class="value">%s</span>' % r)
 
 
@@ -168,7 +178,7 @@ if __name__ == '__main__':
         # for qtname in ['cookie_list_v010100', 'cookie_list_v0100', 'cookie_list_v00', 'cookie_list_v01110000', 'cookie_list_v11110000', 'cookie_list_v110100', 'cookie_list_v1100', 'cookie_list_v10',]:
         # qtname = 'dup_cookie'
         # qtname = 'SDL_CondWaitTimeout'
-        qtname = 'cJSON_GetArraySize'
+        qtname = 'cJSON_GetArraySize_v010'
         g = getQuestionModel(qtname, GraphRole.QUESTION)
         process_question(g, qtname)
 
