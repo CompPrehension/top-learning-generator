@@ -61,6 +61,7 @@ if INIT_GLOBALS:
     fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
     fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
 
+    # See below:
     # qG = fetchGraph(NS_questions.base())
 
 
@@ -241,9 +242,10 @@ def fetchGraph(gUri: str):
 # q_graph = fetchGraph(NS_questions.base())
 if INIT_GLOBALS:
     ### empty graph:
-    qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
+    # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
     # pre-download whole questions graph
-    # qG = fetchGraph(NS_questions.base())
+    print('Pre-download whole questions graph ...')
+    qG = fetchGraph(NS_questions.base())
 
 
 
@@ -452,21 +454,87 @@ def sigmoid(x):
         return z / (1 + z)
 
 
-TAG_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop".split()
+CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop sequence".split()
 
 def question_metrics(g, gl, question_dict, quiet=False):
-    cyclomatic = len(question_dict['name_suffix']) + 1
-    complexity = (question_dict['length'] * 0.1 + cyclomatic) * question_dict['depth'] ** 0.5
-    x = (complexity - 25) / 10
-    integral = sigmoid(x)
-    if not quiet: print('    Question complexity: %d  --> integral_complexity: %5f' % (complexity, integral))
+    data = {}
+
+    # actions_count
+    query = 'SELECT (COUNT(distinct ?s) as ?n) where {?s a :action}'
+    r = g.query(query, initNs=PREFIXES)
+    actions_count = next(iter(r.bindings[0].values())).toPython()
+    data['actions_count'] = actions_count - 1  # omit 'global_code' sequence
+
+    # cyclomatic
+    query = 'SELECT (COUNT(?s) as ?n) where {?s a :expr}'
+    r = g.query(query, initNs=PREFIXES)
+    expr_count = next(iter(r.bindings[0].values())).toPython()
+    data['cyclomatic'] = expr_count + 1
+
+    # max_if_branches
+    query = '''SELECT (COUNT(?b) as ?n) where {
+        ?s :branches_item ?b . ?b a :alt_branch
+    } group by ?s'''
+    r = g.query(query, initNs=PREFIXES)
+    max_if_branches_count = max([next(iter(b.values())).toPython() if b else 0  for b in r.bindings])
+    data['max_if_branches'] = max_if_branches_count
+
+
+    ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item'))  ##  * '+'
+
+    # nesting_depth
+    def action_depth(s):
+        children = g.objects(s, ppath)
+        return 1 + max([0, *map(action_depth, children)])
+
+    root = [*g.objects(None, gl(':global_code'))][0]
+    max_depth = action_depth(root) - 1
+    data['nesting_depth'] = max_depth
+
+
+    # find max loop nesting depth by counting parent loops looking up from bottom
+    query = 'SELECT ?s where {?s a :loop}'
+    r = g.query(query, initNs=PREFIXES)
+    loops = [next(iter(b.values())) for b in r.bindings]
+    if not loops:
+        data['max_loop_nesting_depth'] = 0
+    else:
+        # find reverse nesting: how many loops a loop is nested in?
+        in_loop__ppath = ~ppath * '+'
+        nest_depths = [
+            sum((L, in_loop__ppath, L2) in g  for L2 in loops if L2 is not L)
+            for L in loops
+        ]
+        data['max_loop_nesting_depth'] = max(nest_depths) + 1
+
+
+    #### cyclomatic = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condtion count.
+    values_count_plus_1 = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condtion count.
 
     tags = ["C++", "trace"]
-    for tag in TAG_CANDIDATES:
-        if (None, RDF.type, gl(':' + tag)) in g:
-            tags.append(tag)
+
+    concepts = []
+    for concept in CONCEPT_CANDIDATES:
+        if (None, RDF.type, gl(':' + concept)) in g:
+            tags.append(concept)
         # else:
-        #     print("          [DEBUG] tag not found:", tag)
+        #     print("          [DEBUG] concept not found:", concept)
+
+    ## cyclomatic = data['cyclomatic']
+    solution_steps = question_dict['length']
+    # % 4. - лучший на текущий момент
+    # % точность 0.984848 на: (concepts+2), solution_steps, bad_cyclomatic
+    # % [0.39399354, 0.16434003, 0.01391854, 0.05685927]
+
+    learned_compexity = (0.39399354
+             + 0.16434003 * (len(concepts) + 2)
+             + 0.01391854 * solution_steps
+             + 0.05685927 * values_count_plus_1)
+
+    complexity = learned_compexity
+    x = (complexity - 2) * 5
+    integral = sigmoid(x)
+    if not quiet: print('    Question complexity: %d  --> integral_complexity: %5f' % (complexity, integral))
 
     return dict(
         solution_structural_complexity = round(complexity),
@@ -474,8 +542,10 @@ def question_metrics(g, gl, question_dict, quiet=False):
         distinct_errors_count = len(question_dict['possible_violations']),
         integral_complexity = round(integral, 4),  # 5 digits precision
         has_tag = tuple(tags),
+        has_concept = tuple(sorted(concepts)),
         has_law = tuple(sorted(question_dict['laws'])),
         has_violation = tuple(sorted(question_dict['possible_violations'])),
+        **data
     )
 
 import threading
