@@ -21,13 +21,14 @@ from html2img import html_string2jpg
 
 
 RDF_DIR = 'c:/Temp2/cntrflowoutput_v7_rdf/'
-JSON_DIR = 'c:/Temp2/cntrflowoutput_v7_json/'
-HTML_DIR = 'c:/Temp2/cntrflowoutput_v7_html/'
+JSON_DIR = 'c:/Temp2/selected_questions_json/'
+HTML_DIR = 'c:/Temp2/selected_questions_html/'
 FORMAT_OUT = "turtle"
 EXT_OUT = ".ttl"
 # FORMAT_OUT = "xml"
 # EXT_OUT = ".rdf"
-LOCALE = 'en'
+LOCALE = 'ru'
+# LOCALE = 'en'
 
 def download_questions(offset=None, stop=None, step=None):
 
@@ -48,6 +49,22 @@ def download_questions(offset=None, stop=None, step=None):
 
         process_question(g, qtname)
 
+        # file_out = RDF_DIR + qtname + EXT_OUT
+        # g.serialize(file_out, format=FORMAT_OUT)
+
+
+def process_questions_by_names(names=()):
+
+    print('Starting ....')
+    print('Questions to process: %d' % len(names))
+
+    for qtname in names:
+        print()
+        print("Processing question: ", qtname)
+        print("========")
+        g = getQuestionModel(qtname, GraphRole.QUESTION)
+        # gl = graph_lookup(g, PREFIXES)
+        process_question(g, qtname)
         # file_out = RDF_DIR + qtname + EXT_OUT
         # g.serialize(file_out, format=FORMAT_OUT)
 
@@ -165,11 +182,24 @@ def process_question(g, qtname):
     html_string2jpg(rendered_html, file_out)
 
 
+def read_List_from_file(fpath:str):
+    with open(fpath) as f:
+        text = f.read()
+
+    return [
+        line.strip(' ",')
+        for line in text.splitlines()
+    ]
 
 
 
 if __name__ == '__main__':
     if 1:
+        names = read_List_from_file(r'c:\Users\Olduser\Downloads\selected_questions-names.csv')
+        process_questions_by_names(names[203:])
+        exit(0)
+
+    if 0:
         # qtname = 'cJSON_ParseWithOpts_v1111111011'
         # qtname = 'cJSON_CreateNumber_v0'
         # qtname = 'android_render_rgb_on_rgb_v0'
@@ -185,6 +215,7 @@ if __name__ == '__main__':
         exit(0)
 
 
-    download_questions(0, None, 1)
+    if 0:
+        download_questions(0, None, 1)
 
 

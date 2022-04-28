@@ -15,7 +15,7 @@ from rdflib_utils import graph_lookup, pretty_rdf, TripleOverrider
 
 LOOP_MAX_ITERATIONS = 3
 
-
+# global var can be set from outside the thread to interrupt it
 _INTERRUPT_BY_TIMEOUT = False
 
 def set_interrupt_flag(value:bool=False):

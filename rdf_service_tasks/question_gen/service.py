@@ -7,6 +7,7 @@
 
 import json
 from math import exp
+import math
 
 import pyfuseki
 from pyfuseki import FusekiUpdate, FusekiQuery
@@ -29,6 +30,8 @@ from SPARQLBurger.SPARQLQueryBuilder import *
 
 # Global variables
 INIT_GLOBALS = True
+# INIT_GLOBALS = False
+PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
 qG = None  # guestions graph (pre-fetched)
 fileService = None
 fuseki_update = None
@@ -240,12 +243,14 @@ def fetchGraph(gUri: str):
     return g
 
 # q_graph = fetchGraph(NS_questions.base())
-if INIT_GLOBALS:
+if INIT_GLOBALS and PREFETCH_QUESTIONS:
     ### empty graph:
     # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
-    qG = fetchGraph(NS_questions.base())
+    qUri = NS_questions.base()
+    qUri = 'http://vstu.ru/poas/selected_questions'
+    qG = fetchGraph(qUri)
 
 
 
@@ -281,7 +286,7 @@ def findQuestionByName(questionName, questions_graph=qG, fileService=fileService
 
 def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, fileService=fileService):
         # look for <Question>-<subgraph> relation in metadata first
-        qG = questions_graph or fileService.getGraph(NS_questions.base());
+        qG = questions_graph or fetchGraph(NS_questions.base());
         targetGraphUri = None
 
         if qG:
@@ -369,7 +374,7 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
 
     ngNode = rdflib.term.URIRef(NS_questions.base());
 
-    # create in Question# namespace !
+    # create an uri in Question# namespace !
     qNode = rdflib.term.URIRef(NS_classQuestion.get(questionName));
 
     commands = [];
@@ -684,8 +689,7 @@ def generate_questions_for_templates(offset=None, limit=None):
 
 
 
-
-if __name__ == '__main__':
+def make_questions__main():
     if 1:
         generate_questions_for_templates(158, None) # 30
         exit(0)
@@ -702,3 +706,199 @@ if __name__ == '__main__':
     Templates without questions found: 24  (of 1 315)
     [Finished in 39.5s]
     '''
+
+
+def add_concepts_from_list(file_path='new_types_assigned.txt'):
+    'insert `has_concept` relations to questions by name based on (tsv-like) data from a text file'
+    from pathlib import Path
+    text = Path(file_path).read_text()
+    tasks = [s.split('\t', maxsplit=1) for s in text.splitlines()]
+    # print(tasks[:30])
+
+    insert_concept_query = '''insert {  GRAPH <http://vstu.ru/poas/questions> {
+  ?s <http://vstu.ru/poas/questions/has_concept> %s .
+  }}
+where {  GRAPH <http://vstu.ru/poas/questions> {
+    ?s <http://vstu.ru/poas/questions/has_template> / <http://vstu.ru/poas/questions/name> "%s" .
+}}'''
+    # insert_concept_query % (comma-separated double-quoted strings, template name)
+
+    if not fuseki_update:
+        read_access_config()
+        _fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
+    else:
+        _fuseki_update = fuseki_update
+
+    print(len(tasks), 'questions templates to update, starting ...')
+    ###
+    skipping = True
+    begin_after = 'add_dimension_to_app_chart'
+    ###
+    for template_name, concepts in tasks:
+        if template_name == begin_after:
+            skipping = False
+            continue
+        if skipping: continue
+        print(template_name, '...')
+        # split, qoute & join (there may be several words on the line)
+        concepts = ', '.join('"%s"' % s for s in concepts.split())
+        query = insert_concept_query % (concepts, template_name)
+        res = _fuseki_update.run_sparql(query)
+        print('      SPARQL: insert_concept response code:', res.response.code)
+
+    print('Finished updating questions.')
+
+
+def float_range(start, stop, step):
+    while start < stop:
+        yield float(start)
+        start += step  #### += decimal.Decimal(step)
+
+def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph='http://vstu.ru/poas/selected_questions', size=100, bins=20):
+    ''' Copy a sample of questions with templates from src named graph to dest named graph keeping all the range of available complexity '''
+    import random
+
+    if not INIT_GLOBALS:
+        read_access_config()
+        #### fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
+        fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
+        fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
+
+    # select all values from src_graph first
+    select_all_questions = '''SELECT ?q ?complexity
+    where { GRAPH <%s> {
+        ?q a <http://vstu.ru/poas/questions/Question> .
+        ?q <http://vstu.ru/poas/questions/integral_complexity> ?complexity.
+    }}''' % src_graph
+
+    query_result = fuseki_query.run_sparql(select_all_questions, return_format="json")
+    query_results = json.loads(b''.join(list(query_result)))
+    # {'head': {'vars': ['name']},
+    #  'results': {'bindings': [
+    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
+    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    cplx_qs = [(float(b['complexity']['value']), b['q']['value'] )
+        for b in query_results['results']['bindings']]
+    del query_result; del query_results
+    print(len(cplx_qs), 'questions total.')
+
+    complexities = [t[0] for t in cplx_qs]
+    min_c = min(complexities)
+    max_c = max(complexities)
+    if min_c == max_c:
+        bins = 1
+    step = (max_c - min_c) / bins
+    count_per_step = int(math.ceil(size / bins))
+
+    sample = []
+    # eps = step * 0.0001
+    for L in float_range(min_c, max_c, step):
+        R = L + step
+        sub_sample = [uri for v, uri in cplx_qs if L <= v <= R]
+        print(len(sub_sample), "\tsamples within range [%f, %f]" % (L, R))
+        # select limited number of those
+        sub_sample = random.sample(sub_sample, count_per_step)
+        sample += sub_sample
+
+    sample = list(set(sample))  # filter possible duplicates (taken on sub-range boundaries)
+    print(len(sample), 'questions sampled.')
+    ### print(sample[:2])  # [(0.3385, 'http://vstu.ru/poas/questions/Question#kuhl_m_sekurlsa_krbtgt_keys_v100'), (0.4676, 'http://vstu.ru/poas/questions/Question#computeJD_v010010')]
+
+    copy_question = '''INSERT {
+    GRAPH <%s> {
+        ?s ?qp ?qo .
+        ?t ?tp ?to .
+      }}
+    where {
+      GRAPH <%s> {
+        ?s <http://vstu.ru/poas/questions/has_template> ?t.
+        ?s ?qp ?qo .
+        ?t ?tp ?to .
+      }}''' % (dest_graph, src_graph)
+    # copy_question.replace("?s", '<%s>' % question_uri)
+
+    for question_uri in sample:
+        query = copy_question.replace("?s", '<%s>' % question_uri)
+        res = fuseki_update.run_sparql(query)
+        print('      SPARQL: insert_concept response code:', res.response.code)
+
+    print('Finished selecting questions.')
+
+
+def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', target_zip='./selected_questions-files.zip'):
+    import fs
+    import fs.copy
+    from fs import open_fs
+    from fs.zipfs import WriteZipFS
+    import zipfile
+
+    if not INIT_GLOBALS:
+        read_access_config()
+        # fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
+        # fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
+        fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
+
+    # <http://vstu.ru/poas/questions/has_graph_qt_s>
+    # select all values from src_graph first
+    select_all_files = '''SELECT distinct ?f
+    where { GRAPH <%s> {
+        { [] <http://vstu.ru/poas/questions/has_graph_qt_s> ?f }
+        union
+        { [] <http://vstu.ru/poas/questions/has_graph_qt>   ?f }
+        union
+        { [] <http://vstu.ru/poas/questions/has_graph_q>    ?f }
+        union
+        { [] <http://vstu.ru/poas/questions/has_graph_q_s>  ?f }
+    }}''' % src_graph
+
+    query_result = fuseki_query.run_sparql(select_all_files, return_format="json")
+    query_results = json.loads(b''.join(list(query_result)))
+    # {'head': {'vars': ['name']},
+    #  'results': {'bindings': [
+    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
+    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    file_uris = [b['f']['value']
+        for b in query_results['results']['bindings']]
+    del query_result; del query_results
+
+    # convert to paths & filter "blank" values
+    # print(file_uris)
+    file_uris = [NS_file.localize(u) for u in file_uris if u not in ("rdf:nil", str(RDF.nil))]
+    # print()
+    # print(file_uris)
+
+    print(len(file_uris), 'files total.')
+
+    # save files to archive
+    assert target_zip.lower().endswith('.zip')
+    src_fs = open_fs(FTP_DOWNLOAD_BASE)
+    dst_fs = WriteZipFS(target_zip, compression=zipfile.ZIP_DEFLATED)
+
+    print('copying ..', end='')
+    for sub_path in file_uris:
+        if not src_fs.exists(sub_path):
+            print('! path not found:', sub_path)
+            continue
+
+        dst_fs.makedirs(fs.path.dirname(sub_path), recreate=True)
+        # fs.copy.copy_file_if(src_fs, src_path, dst_fs, dst_path, condition, preserve_time=False)
+        src_path = sub_path
+        dst_path = sub_path
+        fs.copy.copy_file_if(src_fs, src_path, dst_fs, dst_path, condition="newer", preserve_time=False)
+        print('.', end='')
+
+    print(' completed.')
+
+    # Saving is performed automatically when the ZipFS is closed.
+    dst_fs.close()
+
+    print('Archive saved.')
+
+
+
+if __name__ == '__main__':
+    print('Initializing...')
+    # make_questions__main()
+    # add_concepts_from_list()
+    # make_questions_sample(size=200)
+    archive_required_files()
