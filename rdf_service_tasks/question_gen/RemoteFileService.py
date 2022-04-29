@@ -89,7 +89,7 @@ class RemoteFileService:
     def sendModel(self, fullname, g: Graph):
         print('    sendModel:', fullname)
         self.fs_upload.makedirs(fs.path.split(fullname)[0], recreate=True)
-        self.fs_upload.writebytes(fullname, g.serialize(format="turtle"))
+        self.fs_upload.writetext(fullname, g.serialize(format="turtle"))
 
     def insertDummyDirs(self, filepath):
         if (self.dummyDirsForNewFile <= 0):

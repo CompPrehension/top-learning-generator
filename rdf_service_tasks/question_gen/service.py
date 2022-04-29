@@ -8,9 +8,9 @@
 import json
 from math import exp
 import math
+import re
 
-import pyfuseki
-from pyfuseki import FusekiUpdate, FusekiQuery
+import fs
 import rdflib
 from rdflib import Graph, RDF
 import yaml
@@ -22,6 +22,8 @@ from NamespaceUtil import NamespaceUtil
 from ns4guestions import *
 from rdflib_utils import graph_lookup, uploadGraph
 from RemoteFileService import RemoteFileService
+from sparql_wrapper import Sparql
+from analyze_alg import jsObj
 
 
 # using patched version of SPARQLBurger
@@ -29,13 +31,13 @@ from SPARQLBurger.SPARQLQueryBuilder import *
 
 
 # Global variables
+CONFIG = None
 INIT_GLOBALS = True
 # INIT_GLOBALS = False
 PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
 qG = None  # guestions graph (pre-fetched)
 fileService = None
-fuseki_update = None
-fuseki_query = None
+sparql_endpoint = None
 
 
 def read_access_config(file_path='./access_urls.yml'):
@@ -48,25 +50,60 @@ def read_access_config(file_path='./access_urls.yml'):
         print(e)
         exit(1)
 
+    global CONFIG
     global fuseki_host
     global fuseki_db_name
     global FTP_BASE
     global FTP_DOWNLOAD_BASE
+    CONFIG = jsObj(data)
     fuseki_host = data["fuseki_host"]
     fuseki_db_name = data["fuseki_db_name"]
     FTP_BASE = data["ftp_base"]
     FTP_DOWNLOAD_BASE = data["ftp_download_base"]
 
 
+def _get_rdfdb_stats_collectors():
+	'init StateWatcher to watch dataset size on disk as well as number of triples in th dataset.'
+	from misc.watch_rdf_db import StateWatcher
+	from misc.dir_stat import dir_size
+
+	target_dir = CONFIG.fiseki_db_dir
+
+	def watch_dir():
+		return {'dir_size': dir_size(target_dir)}
+
+	def watch_triples():
+		if sparql_endpoint:
+			# Число триплетов в датасете
+			query_result = sparql_endpoint.query("select (count(*) as ?count) {graph ?g {?s ?p ?o}} ", return_format="json")
+			query_results = json.loads(b''.join(list(query_result)))
+			# {'head': {'vars': ['name']},
+			#  'results': {'bindings': [
+			#    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
+			#    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+			row = query_results['results']['bindings'][0]
+			count = row['count']['value']
+			# del query_result; del query_results
+		else:
+			count = -1
+		return {'triples': count}
+
+	return [
+		# reference to bound method `take_snapshot`:
+		StateWatcher(
+			[watch_dir, watch_triples],
+			add_params={'software': CONFIG.software, "db": fuseki_db_name}
+		).take_snapshot
+	]
+
+
 if INIT_GLOBALS:
     read_access_config()
     fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-    fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
-    fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
+    sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, post_update_hooks=_get_rdfdb_stats_collectors())
 
     # See below:
     # qG = fetchGraph(NS_questions.base())
-
 
 
 def makeUpdateTripleQuery(ng, s, p, o, prefixes=()):
@@ -165,7 +202,7 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
         ]).builder
     ).get_text().result
 
-    query_result = fuseki_query.run_sparql(unsolvedTemplates, return_format="json")
+    query_result = sparql_endpoint.query(unsolvedTemplates, return_format="json")
     query_results = json.loads(b''.join(list(query_result)))
     # {'head': {'vars': ['name']},
     #  'results': {'bindings': [
@@ -211,7 +248,7 @@ def templatesWithoutQuestions(limit=None) -> list:
     if limit and limit > 0:
         lonelyTemplates += '\nLIMIT %d' % limit
 
-    query_result = fuseki_query.run_sparql(lonelyTemplates, return_format="json")
+    query_result = sparql_endpoint.query(lonelyTemplates, return_format="json")
     query_results = json.loads(b''.join(list(query_result)))
     # {'head': {'vars': ['name']},
     #  'results': {'bindings': [
@@ -233,11 +270,8 @@ WHERE { GRAPH <%s> {
 '''
 
 def fetchGraph(gUri: str):
-    prefixes = '\n'.join((
-        f"PREFIX qs: <{NS_questions.get()}>",
-    ))
     q = CONSTRUCT_PATTERN % gUri
-    query_result = fuseki_query.run_sparql(q, return_format="turtle")
+    query_result = sparql_endpoint.query(q, return_format="turtle")
     query_results = b''.join(list(query_result))
     g = Graph().parse(format='n3', data=query_results)
     return g
@@ -249,9 +283,11 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS:
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
     qUri = NS_questions.base()
-    qUri = 'http://vstu.ru/poas/selected_questions'
+    # qUri = 'http://vstu.ru/poas/selected_questions'
     qG = fetchGraph(qUri)
 
+    ### qG.serialize('c:/temp2/compp/dump_qG.ttl', format='turtle')
+    print(len(qG), " `- triples existed.")
 
 
 # def getFullTemplate(name):
@@ -274,7 +310,7 @@ def questionStages():
 
 
 def findQuestionByName(questionName, questions_graph=qG, fileService=fileService):
-        qG = questions_graph or fileService.fetchModel(NS_questions.base());
+        qG = questions_graph or fetchGraph(NS_questions.base());
         if qG:
             qNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionName))
             if qNode:
@@ -314,6 +350,27 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, fileS
 def getQuestionSubgraph(questionName, role, fileService=fileService):
     return fileService.fetchModel(nameForQuestionGraph(questionName, role));
 
+def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, fileService=fileService):
+    qgUri = nameForQuestionGraph(questionName, role)
+    fileService.sendModel(qgUri, model);
+    # update questions metadata
+    questionNode = questionNode or findQuestionByName(questionName)
+    assert questionNode, 'question node must present!'
+    qgNode = NS_file.get(qgUri);
+
+    upd_setGraph = makeUpdateTripleQuery(
+            rdflib.term.URIRef(NS_questions.base()).n3(),
+            questionNode.n3(),
+            rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
+            rdflib.term.URIRef(qgNode).n3()
+    );
+
+    ### print(upd_setGraph)
+
+    res = sparql_endpoint.update(upd_setGraph)
+    print('      SPARQL: set question subgraph response code:', res.response.code)
+
+
 def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
     m = Graph();
     for role in questionStages():
@@ -322,6 +379,105 @@ def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileServic
             m += gm;
         if (role == topRole): break;
     return m
+
+__PATCH_TTL_RE = None
+
+def _patch_and_parse_ttl(opened_file):
+    global __PATCH_TTL_RE
+    if not __PATCH_TTL_RE:
+        __PATCH_TTL_RE = re.compile(r'(?:(?<=:return)|(?<=:break)|(?<=:continue))\s+:stmt')
+
+    data = opened_file.read()
+    data = __PATCH_TTL_RE.sub('', data)
+    g = Graph().parse(format='ttl', data=data.encode())
+    return g
+
+
+def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024)):
+
+    files_total = 0
+    files_selected = 0
+
+    src_fs = fs.open_fs(rdf_dir)
+    for path, info in src_fs.walk.info(namespaces=['details']):
+        if not info.is_dir:
+            if not info.name.endswith(wanted_ext):
+                continue
+            files_total += 1
+            if file_size_filter and not(file_size_filter[0] <= info.size <= file_size_filter[1]):
+                continue
+            files_selected += 1
+
+            # cut last two sections with digits
+            name = "_".join(info.name.split("__")[:-2])
+            print('[%3d]' % files_selected, name, '...')
+
+            qUri = createQuestionTemplate(name);
+
+            print("    Upload model ...");
+            with src_fs.open(path) as f:
+                m = _patch_and_parse_ttl(f)
+            setQuestionSubgraph(name, GraphRole.QUESTION_TEMPLATE, m, questionNode=rdflib.term.URIRef(qUri))
+
+    print("Uploading templates completed.")
+    print("Used", files_selected, 'files of', files_total, 'in the directory.')
+
+
+
+def createQuestionTemplate(questionTemplateName) -> 'question template URI':
+    global qG
+    if qG is None:
+        # fetch it once as template data is needed only
+        qG = fetchGraph(NS_questions.base());  # questions Graph containing questions metadata
+    if qG is None:
+        return None
+
+    templNodeExists = (None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionTemplateName)) in qG;
+
+    if templNodeExists:
+        qtemplNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionTemplateName));
+        return qtemplNode
+
+
+    nodeClass = rdflib.term.URIRef(NS_classQuestionTemplate.base())
+
+    ngNode = rdflib.term.URIRef(NS_questions.base());
+
+    # create an uri in QuestionTemplate# namespace !
+    qNode = rdflib.term.URIRef(NS_classQuestionTemplate.get(questionTemplateName));
+
+    commands = [];
+
+    commands.append(makeInsertTriplesQuery(ngNode.n3(), [(
+        qNode.n3(),
+        RDF.type.n3(),
+        nodeClass.n3()
+    )]));
+
+    commands.append(makeUpdateTripleQuery(ngNode.n3(),
+            qNode.n3(),
+            rdflib.term.URIRef(NS_questions.get("name")).n3(),
+            rdflib.term.Literal(questionTemplateName).n3()));
+
+    # initialize template's graphs as empty ...
+    # using "template-only" roles
+    for role in (GraphRole.QUESTION_TEMPLATE, GraphRole.QUESTION_TEMPLATE_SOLVED):
+        obj = RDF.nil
+        commands.append(makeUpdateTripleQuery(ngNode.n3(),
+                qNode.n3(),
+                rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
+                obj.n3()));
+
+    full_query = '\n;\n'.join(commands)
+
+    ### print(full_query); # exit()
+
+    res = sparql_endpoint.update(full_query)
+    print('      SPARQL: create template response code:', res.response.code)
+
+    # cannot not update as quad insertion is not for a single graph
+    # qG.update(full_query)
+    return str(qNode);
 
 
 class expr_bool_values:
@@ -429,10 +585,10 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
 
     ### print(full_query); exit()
 
-    res = fuseki_update.run_sparql(full_query)
+    res = sparql_endpoint.update(full_query)
     print('      SPARQL: create question response code:', res.response.code)
 
-    # do not update as quad insertion is not for a single graph
+    # cannot not update as quad insertion is not for a single graph
     # qG.update(full_query)
     return str(qNode);
 
@@ -723,11 +879,11 @@ where {  GRAPH <http://vstu.ru/poas/questions> {
 }}'''
     # insert_concept_query % (comma-separated double-quoted strings, template name)
 
-    if not fuseki_update:
+    if not sparql_endpoint:
         read_access_config()
-        _fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
+        _sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
     else:
-        _fuseki_update = fuseki_update
+        _sparql_endpoint = sparql_endpoint
 
     print(len(tasks), 'questions templates to update, starting ...')
     ###
@@ -743,7 +899,7 @@ where {  GRAPH <http://vstu.ru/poas/questions> {
         # split, qoute & join (there may be several words on the line)
         concepts = ', '.join('"%s"' % s for s in concepts.split())
         query = insert_concept_query % (concepts, template_name)
-        res = _fuseki_update.run_sparql(query)
+        res = _sparql_endpoint.update(query)
         print('      SPARQL: insert_concept response code:', res.response.code)
 
     print('Finished updating questions.')
@@ -759,10 +915,10 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
     import random
 
     if not INIT_GLOBALS:
+    # if not sparql_endpoint:
         read_access_config()
         #### fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
-        fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
+        sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
 
     # select all values from src_graph first
     select_all_questions = '''SELECT ?q ?complexity
@@ -771,7 +927,7 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
         ?q <http://vstu.ru/poas/questions/integral_complexity> ?complexity.
     }}''' % src_graph
 
-    query_result = fuseki_query.run_sparql(select_all_questions, return_format="json")
+    query_result = sparql_endpoint.query(select_all_questions, return_format="json")
     query_results = json.loads(b''.join(list(query_result)))
     # {'head': {'vars': ['name']},
     #  'results': {'bindings': [
@@ -819,7 +975,7 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
 
     for question_uri in sample:
         query = copy_question.replace("?s", '<%s>' % question_uri)
-        res = fuseki_update.run_sparql(query)
+        res = sparql_endpoint.update(query)
         print('      SPARQL: insert_concept response code:', res.response.code)
 
     print('Finished selecting questions.')
@@ -833,10 +989,10 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
     import zipfile
 
     if not INIT_GLOBALS:
+    # if not sparql_endpoint:
         read_access_config()
         # fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        # fuseki_update = FusekiUpdate(fuseki_host, fuseki_db_name)
-        fuseki_query  = FusekiQuery (fuseki_host, fuseki_db_name)
+        sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
 
     # <http://vstu.ru/poas/questions/has_graph_qt_s>
     # select all values from src_graph first
@@ -851,7 +1007,7 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
         { [] <http://vstu.ru/poas/questions/has_graph_q_s>  ?f }
     }}''' % src_graph
 
-    query_result = fuseki_query.run_sparql(select_all_files, return_format="json")
+    query_result = sparql_endpoint.query(select_all_files, return_format="json")
     query_results = json.loads(b''.join(list(query_result)))
     # {'head': {'vars': ['name']},
     #  'results': {'bindings': [
@@ -898,7 +1054,10 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
 
 if __name__ == '__main__':
     print('Initializing...')
+    upload_templates(r'c:/Temp2/cf_v8-pre')
+    # upload_templates(r'c:/Temp2/cf_v8')
     # make_questions__main()
     # add_concepts_from_list()
     # make_questions_sample(size=200)
-    archive_required_files()
+    # archive_required_files()
+    print('Bye.')

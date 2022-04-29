@@ -1,5 +1,7 @@
+# pyfilesystem
 fs
 pyfuseki
+# sparqlwrapper
 rdflib
 PyYAML
 # SPARQL-Burger < -- use patched local version
