@@ -189,7 +189,7 @@ def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 	return array
 
 # using output of ctrlstrct_run helper
-LEAF_ACTION_CLASSES = [s for s in (['algorithm', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop', 'stmt', 'else', 'infinite_loop', 'alternative', 'foreach_loop', 'ntimes_loop', 'func', 'if', 'expr'] + ['sequence', 'boundary'])]
+LEAF_ACTION_CLASSES = [s for s in (['algorithm', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop', 'stmt', 'else', 'infinite_loop', 'alternative', 'foreach_loop', 'ntimes_loop', 'func', 'if', 'expr'] + ['sequence', 'boundary', 'return', 'break', 'continue', ])]
 
 class AlgorithmGraphWalker(GView):
 	# def __init__(self, g: Graph, subject: URIRef, gl: graph_lookup=None):
@@ -312,8 +312,8 @@ def graph_2_json(g, root_class=NS_code.get('algorithm')):
 	# 1. FIX names
 	fix_names_in_graph(g, w.gl, fix_complex_names=False)
 
-	# 2. REMOVE some statements
-	shrink_linear_stmts(g, w.gl)
+	# # 2. REMOVE some statements
+	# shrink_linear_stmts(g, w.gl)
 
 	# 3. EXPORT to algorithm_json
 	a_json = w.to_algorithm_json()

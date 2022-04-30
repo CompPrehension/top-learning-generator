@@ -107,15 +107,11 @@ def patch_graph(g):
         tor.apply_on_graph(g, remove_self=True)
         print('\t [INFO]  TripleOverrider changes were applied.')
 
-
-def process_question(g, qtname):
-    patch_graph(g)
-
-    if 0: ###
-        file_out = RDF_DIR + qtname + EXT_OUT
-        g.serialize(file_out, format=FORMAT_OUT)
-
+def convert_graph_to_json(g):
+    'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, remove acts & boundaries.'
     gl = graph_lookup(g, PREFIXES)
+
+    expr_values = {}
 
     for expr in g.subjects(RDF.type, gl(':expr')):
         acts = []
@@ -144,6 +140,12 @@ def process_question(g, qtname):
                gl(':cond_values_hint'),
                rdflib.term.Literal(make_values_hint(values, is_loop, is_postcond))))
 
+        # save expr values
+        stmt_name = g.value(expr, gl(':stmt_name'), None)
+        if stmt_name:
+            expr_values[str(stmt_name)] = values
+
+
     # remove all act & boundary
     for s in [
             *g.subjects(gl(':executes'), None),
@@ -157,9 +159,35 @@ def process_question(g, qtname):
         g.remove((s, None, None))
         # g.remove((None, None, s))
 
+    # add act_name to actions (as just a copy of stmt_name)
+    for a in g.subjects(RDF.type, gl(':action')):
+        stmt_name = g.value(a, gl(':stmt_name'), None)
+        if stmt_name:
+            g.set((a,
+                   gl(':act_name'),
+                   stmt_name))
+
+
     g.bind('', NS_code.get()) # set namespace for gl
 
     a_json = graph_2_json(g)
+    # assign values (for export_algtr2dict)
+    a_json["expr_values"] = expr_values
+
+    # fix act_name(s) to be dict(s)
+    ## TODO ...
+
+    return a_json
+
+
+def process_question(g, qtname):
+    patch_graph(g)
+
+    if 0: ###
+        file_out = RDF_DIR + qtname + EXT_OUT
+        g.serialize(file_out, format=FORMAT_OUT)
+
+    a_json = convert_graph_to_json(g)
 
     # print()
     # print()
@@ -169,7 +197,7 @@ def process_question(g, qtname):
     import json
     out = JSON_DIR + qtname + '.json'
     with open(out, mode='w') as f:
-        data = json.dump(a_json, f, indent=1)
+        json.dump(a_json, f, indent=1)
 
 
     rendered_html = render_code(a_json, text_mode='html', locale=LOCALE, show_buttons=True, raise_on_error=True)

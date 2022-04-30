@@ -9,6 +9,7 @@ import json
 from math import exp
 import math
 import re
+import sys
 
 import fs
 import rdflib
@@ -24,6 +25,9 @@ from rdflib_utils import graph_lookup, uploadGraph
 from RemoteFileService import RemoteFileService
 from sparql_wrapper import Sparql
 from analyze_alg import jsObj
+
+sys.path.insert(1, '../../../c_owl/')
+from ctrlstrct_test import make_question_dict_for_alg_json
 
 
 # using patched version of SPARQLBurger
@@ -88,12 +92,14 @@ def _get_rdfdb_stats_collectors():
 			count = -1
 		return {'triples': count}
 
+	sw = StateWatcher(
+		[watch_dir, watch_triples],
+		add_params={'software': CONFIG.software, "db": fuseki_db_name}
+	)
+	CONFIG.rdfdb_watcher = sw
 	return [
 		# reference to bound method `take_snapshot`:
-		StateWatcher(
-			[watch_dir, watch_triples],
-			add_params={'software': CONFIG.software, "db": fuseki_db_name}
-		).take_snapshot
+		sw.take_snapshot
 	]
 
 
@@ -191,7 +197,7 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
 
     unsolvedTemplates = builder(SPARQLSelectQuery()
     ).add_prefix(
-        Prefix('rdf', RDF.uri)
+        Prefix('rdf', PREFIXES['rdf'])
     ).add_variables(
         ["?name"]
     ).set_where_pattern(
@@ -222,7 +228,7 @@ def templatesWithoutQuestions(limit=None) -> list:
 
     lonelyTemplates = builder(SPARQLSelectQuery()
     ).add_prefix(
-        Prefix('rdf', RDF.uri)
+        Prefix('rdf', PREFIXES['rdf'])
     ).add_variables(
         ["?name"]
     ).set_where_pattern(
@@ -286,8 +292,11 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS:
     # qUri = 'http://vstu.ru/poas/selected_questions'
     qG = fetchGraph(qUri)
 
-    ### qG.serialize('c:/temp2/compp/dump_qG.ttl', format='turtle')
-    print(len(qG), " `- triples existed.")
+    ###
+    # dump_qG_to = CONFIG.ftp_base + CONFIG.fuseki_db_name + '.ttl'
+    dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.fuseki_db_name + '.ttl'
+    qG.serialize(dump_qG_to, format='turtle')
+    print(len(qG), "triples are already exist.")
 
 
 # def getFullTemplate(name):
@@ -309,7 +318,7 @@ def questionStages():
     ]
 
 
-def findQuestionByName(questionName, questions_graph=qG, fileService=fileService):
+def findQuestionByName(questionName, questions_graph=qG):
         qG = questions_graph or fetchGraph(NS_questions.base());
         if qG:
             qNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionName))
@@ -320,7 +329,7 @@ def findQuestionByName(questionName, questions_graph=qG, fileService=fileService
         return None;
 
 
-def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, fileService=fileService):
+def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_ext=".ttl", fileService=fileService):
         # look for <Question>-<subgraph> relation in metadata first
         qG = questions_graph or fetchGraph(NS_questions.base());
         targetGraphUri = None
@@ -341,8 +350,7 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, fileS
 
         # no known relation - get default for a new one
         print("    (No question graph found for Role '%s' and name: %s)" % (role.prefix, questionName))
-        ext = ".ttl"
-        return fileService.prepareNameForFile(role.ns().get(questionName + ext), False);
+        return fileService.prepareNameForFile(role.ns().get(questionName + file_ext), False);
 
 
 
@@ -350,9 +358,10 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, fileS
 def getQuestionSubgraph(questionName, role, fileService=fileService):
     return fileService.fetchModel(nameForQuestionGraph(questionName, role));
 
-def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, fileService=fileService):
-    qgUri = nameForQuestionGraph(questionName, role)
-    fileService.sendModel(qgUri, model);
+def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, subgraph_name=None, fileService=fileService):
+    qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
+    if model:
+	    fileService.sendModel(qgUri, model);
     # update questions metadata
     questionNode = questionNode or findQuestionByName(questionName)
     assert questionNode, 'question node must present!'
@@ -556,7 +565,11 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
 
     # initialize question's graphs as empty ...
     # using "question-only" roles
-    for role in (GraphRole.QUESTION, GraphRole.QUESTION_SOLVED):
+    for role in (
+            GraphRole.QUESTION,
+            GraphRole.QUESTION_SOLVED,
+            GraphRole.QUESTION_DATA
+        ):
         obj = RDF.nil
         if role == GraphRole.QUESTION and questionDataGraphUri:
             obj = rdflib.term.URIRef(questionDataGraphUri)
@@ -615,7 +628,7 @@ def sigmoid(x):
         return z / (1 + z)
 
 
-CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop sequence".split()
+CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop sequence return break continue".split()
 
 def question_metrics(g, gl, question_dict, quiet=False):
     data = {}
@@ -677,7 +690,7 @@ def question_metrics(g, gl, question_dict, quiet=False):
     concepts = []
     for concept in CONCEPT_CANDIDATES:
         if (None, RDF.type, gl(':' + concept)) in g:
-            tags.append(concept)
+            concepts.append(concept)
         # else:
         #     print("          [DEBUG] concept not found:", concept)
 
@@ -844,18 +857,75 @@ def generate_questions_for_templates(offset=None, limit=None):
     print('done.')
 
 
+def process_question(qname):
+    g = getQuestionModel(qname, GraphRole.QUESTION)
+    # gl = graph_lookup(g, PREFIXES)
+
+    from full_questions import convert_graph_to_json
+
+    alg_json = convert_graph_to_json(g)
+
+    q_dict = make_question_dict_for_alg_json(alg_json, qname)
+
+    fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
+
+    print('    Uploading json file ...')
+    fileService.sendFile(fullname,
+        json.dumps(q_dict, ensure_ascii=False).encode()
+    )
+
+    setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
+
+
+def generate_data_for_questions(offset=None, limit=None):
+
+    print("Requesting questions without data ...", flush=True)
+
+    questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
+
+    ### debugging: get all existing questions instead
+    # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
+
+
+    print('Questions without data found: %d' % len(questions_to_process))
+
+    questions_count = 0
+    skip_count = 0
+
+    for qname in questions_to_process[offset:limit]:
+
+        print()
+        print()
+        print("Processing question: ", qname, "(i: %d)" % questions_count)
+        print("    (with errors so far: %d)" % skip_count)
+        print("========")
+        try:
+            process_question(qname)
+            questions_count += 1
+        except NotImplementedError as e:
+            skip_count += 1
+            print()
+            print('Error with question: ', qname)
+            print(e)
+            print()
+
+    print()
+    print(questions_count, 'questions updated with data.')
+    print('done.')
+
+
 
 def make_questions__main():
     if 1:
-        generate_questions_for_templates(158, None) # 30
+        generate_questions_for_templates(0, None) # 30
         exit(0)
-
-    # qtname = 'packet_queue_get'
-    qtname = 'SDL_CondWaitTimeout'
-    print("========", flush=True)
-    questions_count = process_template(qtname)
-    print()
-    print(questions_count, 'questions created for template.')
+    else:
+        # qtname = 'packet_queue_get'
+        qtname = 'SDL_CondWaitTimeout'
+        print("========", flush=True)
+        questions_count = process_template(qtname)
+        print()
+        print(questions_count, 'questions created for template.')
 
 
     '''
@@ -1050,14 +1120,25 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
 
     print('Archive saved.')
 
+def just_rdfdb_monitoring():
+	from time import sleep
+	sw = CONFIG.rdfdb_watcher
+	while True:
+		sw.take_snapshot()
+		print(end='.')
+		sleep(5)
+
 
 
 if __name__ == '__main__':
     print('Initializing...')
-    upload_templates(r'c:/Temp2/cf_v8-pre')
+    # upload_templates(r'c:/Temp2/cf_v8-pre')
     # upload_templates(r'c:/Temp2/cf_v8')
     # make_questions__main()
+    generate_data_for_questions(0, None)
+
     # add_concepts_from_list()
     # make_questions_sample(size=200)
     # archive_required_files()
+    # just_rdfdb_monitoring()
     print('Bye.')

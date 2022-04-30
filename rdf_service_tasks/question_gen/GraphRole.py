@@ -37,6 +37,8 @@ class GraphRole(JavaEnum):
     QUESTION = ("q#"),  # data complementing template to complete question
     QUESTION_SOLVED = ("q_s#")  # inferences from whole question
 
+    QUESTION_DATA = ("q_data#")  # data required to create a question
+
 
     def __init__(self, prefix):  #  num,
         # self.num = num
