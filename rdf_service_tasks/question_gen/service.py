@@ -27,6 +27,9 @@ from sparql_wrapper import Sparql
 from analyze_alg import jsObj
 
 sys.path.insert(1, '../../../c_owl/')
+if 0:
+    # just for debugger to see the code in different directory
+    from ....c_owl.ctrlstrct_test import make_question_dict_for_alg_json
 from ctrlstrct_test import make_question_dict_for_alg_json
 
 
@@ -38,7 +41,12 @@ from SPARQLBurger.SPARQLQueryBuilder import *
 CONFIG = None
 INIT_GLOBALS = True
 # INIT_GLOBALS = False
+
+# PREFETCH_QUESTIONS = False
 PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
+DUMP_QUESTION_GRAPH_TO_FILE = False
+GATHER_DB_SIZE_INFO = False
+
 qG = None  # guestions graph (pre-fetched)
 fileService = None
 sparql_endpoint = None
@@ -56,57 +64,62 @@ def read_access_config(file_path='./access_urls.yml'):
 
     global CONFIG
     global fuseki_host
-    global fuseki_db_name
+    global rdf_db_name
     global FTP_BASE
     global FTP_DOWNLOAD_BASE
     CONFIG = jsObj(data)
     fuseki_host = data["fuseki_host"]
-    fuseki_db_name = data["fuseki_db_name"]
+    rdf_db_name = data["rdf_db_name"]
     FTP_BASE = data["ftp_base"]
     FTP_DOWNLOAD_BASE = data["ftp_download_base"]
 
 
 def _get_rdfdb_stats_collectors():
-	'init StateWatcher to watch dataset size on disk as well as number of triples in th dataset.'
-	from misc.watch_rdf_db import StateWatcher
-	from misc.dir_stat import dir_size
+    'init StateWatcher to watch dataset size on disk as well as number of triples in th dataset.'
 
-	target_dir = CONFIG.fiseki_db_dir
+    if not GATHER_DB_SIZE_INFO:
+    	return ()
 
-	def watch_dir():
-		return {'dir_size': dir_size(target_dir)}
+    from misc.watch_rdf_db import StateWatcher
+    from misc.dir_stat import dir_size
 
-	def watch_triples():
-		if sparql_endpoint:
-			# Число триплетов в датасете
-			query_result = sparql_endpoint.query("select (count(*) as ?count) {graph ?g {?s ?p ?o}} ", return_format="json")
-			query_results = json.loads(b''.join(list(query_result)))
-			# {'head': {'vars': ['name']},
-			#  'results': {'bindings': [
-			#    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
-			#    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
-			row = query_results['results']['bindings'][0]
-			count = row['count']['value']
-			# del query_result; del query_results
-		else:
-			count = -1
-		return {'triples': count}
+    target_dir = CONFIG.db_dir
 
-	sw = StateWatcher(
-		[watch_dir, watch_triples],
-		add_params={'software': CONFIG.software, "db": fuseki_db_name}
-	)
-	CONFIG.rdfdb_watcher = sw
-	return [
-		# reference to bound method `take_snapshot`:
-		sw.take_snapshot
-	]
+    def watch_dir():
+        return {'dir_size': dir_size(target_dir)}
+
+    def watch_triples():
+        if sparql_endpoint:
+            # Число триплетов в датасете
+            query_results = sparql_endpoint.query("select (count(*) as ?count) {graph ?g {?s ?p ?o}} ", return_format="json")
+            row = query_results['results']['bindings'][0]
+            count = row['count']['value']
+            # del query_results
+        else:
+            count = -1
+        return {'triples': count}
+
+    sw = StateWatcher(
+        [watch_dir, watch_triples],
+        add_params={'software': CONFIG.software, "db": rdf_db_name}
+    )
+    CONFIG.rdfdb_watcher = sw
+    return [
+        # reference to bound method `take_snapshot`:
+        sw.take_snapshot
+    ]
 
 
 if INIT_GLOBALS:
     read_access_config()
     fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-    sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, post_update_hooks=_get_rdfdb_stats_collectors())
+    sparql_endpoint = Sparql(
+        fuseki_host, rdf_db_name,
+        query_url=CONFIG.query_url,
+        update_url=CONFIG.update_url,
+        credentials=CONFIG.get('credentials'),
+        post_update_hooks=_get_rdfdb_stats_collectors()
+    )
 
     # See below:
     # qG = fetchGraph(NS_questions.base())
@@ -208,14 +221,9 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
         ]).builder
     ).get_text().result
 
-    query_result = sparql_endpoint.query(unsolvedTemplates, return_format="json")
-    query_results = json.loads(b''.join(list(query_result)))
-    # {'head': {'vars': ['name']},
-    #  'results': {'bindings': [
-    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
-    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    query_results = sparql_endpoint.query(unsolvedTemplates, return_format="json")
     names = [b['name']['value'] for b in query_results['results']['bindings']]
-    # del query_result; del query_results
+    # del query_results
     return names
 
 # unsolved_qs = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
@@ -254,14 +262,9 @@ def templatesWithoutQuestions(limit=None) -> list:
     if limit and limit > 0:
         lonelyTemplates += '\nLIMIT %d' % limit
 
-    query_result = sparql_endpoint.query(lonelyTemplates, return_format="json")
-    query_results = json.loads(b''.join(list(query_result)))
-    # {'head': {'vars': ['name']},
-    #  'results': {'bindings': [
-    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
-    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    query_results = sparql_endpoint.query(lonelyTemplates, return_format="json")
     names = [b['name']['value'] for b in query_results['results']['bindings']]
-    # del query_result; del query_results
+    # del query_results
     return names
 
 # templates_to_create_questions = templatesWithoutQuestions()
@@ -292,11 +295,12 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS:
     # qUri = 'http://vstu.ru/poas/selected_questions'
     qG = fetchGraph(qUri)
 
-    ###
-    # dump_qG_to = CONFIG.ftp_base + CONFIG.fuseki_db_name + '.ttl'
-    dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.fuseki_db_name + '.ttl'
-    qG.serialize(dump_qG_to, format='turtle')
-    print(len(qG), "triples are already exist.")
+    if DUMP_QUESTION_GRAPH_TO_FILE:
+        ###
+        # dump_qG_to = CONFIG.ftp_base + CONFIG.rdf_db_name + '.ttl'
+        dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
+        qG.serialize(dump_qG_to, format='turtle')
+        print(len(qG), "triples are already exist.")
 
 
 # def getFullTemplate(name):
@@ -361,7 +365,7 @@ def getQuestionSubgraph(questionName, role, fileService=fileService):
 def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, subgraph_name=None, fileService=fileService):
     qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     if model:
-	    fileService.sendModel(qgUri, model);
+        fileService.sendModel(qgUri, model);
     # update questions metadata
     questionNode = questionNode or findQuestionByName(questionName)
     assert questionNode, 'question node must present!'
@@ -951,7 +955,7 @@ where {  GRAPH <http://vstu.ru/poas/questions> {
 
     if not sparql_endpoint:
         read_access_config()
-        _sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
+        _sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
     else:
         _sparql_endpoint = sparql_endpoint
 
@@ -988,7 +992,7 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
     # if not sparql_endpoint:
         read_access_config()
         #### fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
+        sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
 
     # select all values from src_graph first
     select_all_questions = '''SELECT ?q ?complexity
@@ -997,15 +1001,10 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
         ?q <http://vstu.ru/poas/questions/integral_complexity> ?complexity.
     }}''' % src_graph
 
-    query_result = sparql_endpoint.query(select_all_questions, return_format="json")
-    query_results = json.loads(b''.join(list(query_result)))
-    # {'head': {'vars': ['name']},
-    #  'results': {'bindings': [
-    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
-    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    query_results = sparql_endpoint.query(select_all_questions, return_format="json")
     cplx_qs = [(float(b['complexity']['value']), b['q']['value'] )
         for b in query_results['results']['bindings']]
-    del query_result; del query_results
+    del query_results
     print(len(cplx_qs), 'questions total.')
 
     complexities = [t[0] for t in cplx_qs]
@@ -1062,7 +1061,7 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
     # if not sparql_endpoint:
         read_access_config()
         # fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        sparql_endpoint = Sparql(fuseki_host, fuseki_db_name, )
+        sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
 
     # <http://vstu.ru/poas/questions/has_graph_qt_s>
     # select all values from src_graph first
@@ -1077,15 +1076,10 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
         { [] <http://vstu.ru/poas/questions/has_graph_q_s>  ?f }
     }}''' % src_graph
 
-    query_result = sparql_endpoint.query(select_all_files, return_format="json")
-    query_results = json.loads(b''.join(list(query_result)))
-    # {'head': {'vars': ['name']},
-    #  'results': {'bindings': [
-    #    {'name': {'type': 'literal', 'value': '1__memcpy_s'}},
-    #    {'name': {'type': 'literal', 'value': '5__strnlen_s'}}]}}
+    query_results = sparql_endpoint.query(select_all_files, return_format="json")
     file_uris = [b['f']['value']
         for b in query_results['results']['bindings']]
-    del query_result; del query_results
+    del query_results
 
     # convert to paths & filter "blank" values
     # print(file_uris)
@@ -1121,13 +1115,89 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
     print('Archive saved.')
 
 def just_rdfdb_monitoring():
-	from time import sleep
-	sw = CONFIG.rdfdb_watcher
-	while True:
-		sw.take_snapshot()
-		print(end='.')
-		sleep(5)
+    from time import sleep
+    sw = CONFIG.rdfdb_watcher
+    while True:
+        sw.take_snapshot()
+        print(end='.')
+        sleep(5)
 
+
+def _insert_triples(triples, ng_uri=rdflib.term.URIRef(NS_questions.base()).n3()):
+    sparql_text = makeInsertTriplesQuery(ng_uri, triples)
+    sparql_endpoint.update(sparql_text)
+
+def measure_disk_usage_uploading_questions(rdf_src_filepath='c:/Temp2/compp/control_flow.ttl'):
+    'Note: set PREFETCH_QUESTIONS = False'
+    g = rdflib.Graph().parse(rdf_src_filepath)
+
+    print(len(g), 'triples in src graph.')
+
+    batch_size = 400
+    _upload_graph(g, rdflib.term.URIRef(NS_questions.base()).n3(), batch_size)
+    print('triples insertion completed.')
+
+
+def _upload_graph(g, ng_uri, batch_size=-1, verbose=True):
+
+    batch = []
+    i = 0
+
+    for t in g:
+        batch.append(tuple(
+            ### ??? (for Parliament) ###
+
+            node.n3() for node in t
+        ))
+
+        if batch_size > 0 and len(batch) >= batch_size:
+            _insert_triples(batch, ng_uri)
+            batch.clear()
+            i += batch_size
+            if verbose: print(i, 'triples inserted')
+
+    if batch:
+        _insert_triples(batch, ng_uri)
+        i += len(batch)
+        batch.clear()
+        if verbose: print(i, 'triples inserted.')
+
+
+def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEMPLATE, skip=0):
+    'Note: set PREFETCH_QUESTIONS = True'
+    target_role_uriref = rdflib.term.URIRef(questionSubgraphPropertyFor(target_role))
+
+    target_model_paths = []
+
+    print("searching for named graphs for", target_role.prefix, "...")
+
+    if qG:
+        for targetGraphUri in qG.objects(None, target_role_uriref):
+            if targetGraphUri != RDF.nil:
+
+                qsgName = str(targetGraphUri)
+                target_model_paths.append(
+                    (qsgName, NS_file.localize(qsgName))
+                    )
+            else:
+                print('... not a graph!')
+
+    print(len(target_model_paths), "target named graphs found.")
+    target_model_paths = list(set(target_model_paths))
+    print(len(target_model_paths), "unique graphs.")
+
+    if skip > 0:
+        target_model_paths = target_model_paths[skip:]
+    print(len(target_model_paths), "graphs to send.")
+
+    for i, (qgUri, path) in enumerate(target_model_paths):
+        g = fileService.fetchModel(path)
+        # ###
+        # # set constant NG (for Parliament)
+        # qgUri = str(rdflib.term.URIRef(NS_questions.base()))
+        # ###
+        _upload_graph(g, ng_uri=URI(qgUri), batch_size=0)
+        print('graph #%d uploaded:' % (i + 1), path)
 
 
 if __name__ == '__main__':
@@ -1141,4 +1211,10 @@ if __name__ == '__main__':
     # make_questions_sample(size=200)
     # archive_required_files()
     # just_rdfdb_monitoring()
+
+    # measure_disk_usage_uploading_questions()
+    # measure_disk_usage_uploading_named_graphs()
+    # measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEMPLATE_SOLVED)
+    # measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION, skip=0)
+    # measure_disk_usage_uploading_questions('c:/D/Work/YDev/CompPr/3stores/bench/bsbmtools-0.2/pc2815-1M.ttl')
     print('Bye.')

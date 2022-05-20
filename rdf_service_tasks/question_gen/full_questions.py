@@ -109,6 +109,9 @@ def patch_graph(g):
 
 def convert_graph_to_json(g):
     'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, remove acts & boundaries.'
+
+    patch_graph(g)
+
     gl = graph_lookup(g, PREFIXES)
 
     expr_values = {}
@@ -125,7 +128,7 @@ def convert_graph_to_json(g):
         acts.sort()
         # print('\nacts:', *acts, sep='\n\t')
         values = [v if v is None else v.toPython()
-                  for i,v in acts]
+                  for _i,v in acts]
 
         parent = g.value(None, gl(':cond'), expr)
 

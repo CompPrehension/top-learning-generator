@@ -227,6 +227,7 @@ class AlgorithmGraphWalker(GView):
 				values = [n for n in LEAF_ACTION_CLASSES if n in values][:1]
 			if not values:
 				print('Empty values for key:::', k)
+				print('             subject:::', self)
 				continue
 			is_collection = len(values) > 1 or k.endswith('_item')
 			val = list(values) if is_collection else values[0]
