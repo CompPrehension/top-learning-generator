@@ -225,7 +225,7 @@ def read_List_from_file(fpath:str):
 
 
 if __name__ == '__main__':
-    if 1:
+    if 0:
         names = read_List_from_file(r'c:\Users\Olduser\Downloads\selected_questions-names.csv')
         process_questions_by_names(names[203:])
         exit(0)

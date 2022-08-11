@@ -1,2 +1,33 @@
 # access_urls.yml
 
+# file access
+
+ftp_base: "c:/data/compp/control_flow/"
+ftp_download_base: "c:/data/compp/control_flow/"
+
+
+###  Triple stores  ###
+
+
+# # Fuseki (latest version by 04.05.0222)
+# software: "Fuseki 4.4.0"
+# fuseki_host: 'http://localhost:6515'
+# query_url:  null
+# update_url: null
+
+# # gathering stats
+# # rdf_db_name: 'control_flow'
+# # db_dir: "c:/D/Work/YDev/CompPr/fuseki/apache-jena-fuseki-4.4.0/control_flow/Data-0001"
+# rdf_db_name: 'expression'
+# db_dir: "c:/D/Work/YDev/CompPr/fuseki/apache-jena-fuseki-4.4.0/expression/Data-0001"
+
+# # GraphDB Free
+# software: "GraphDB Free 9.11.1"
+# fuseki_host: null
+
+# ### cf_pi  : questions -> 670.5s (batch=20)
+# rdf_db_name: cf_pi
+# query_url:  "http://localhost:7200/repositories/cf_pi"
+# update_url: "http://localhost:7200/repositories/cf_pi/statements"
+# db_dir: "c:/Users/Olduser/AppData/Roaming/GraphDB/data/repositories/cf_pi/storage"
+

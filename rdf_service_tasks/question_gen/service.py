@@ -292,7 +292,7 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS:
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
     qUri = NS_questions.base()
-    # qUri = 'http://vstu.ru/poas/selected_questions'
+    ## qUri = 'http://vstu.ru/poas/selected_questions'
     qG = fetchGraph(qUri)
 
     if DUMP_QUESTION_GRAPH_TO_FILE:
@@ -876,6 +876,7 @@ def process_question(qname):
     print('    Uploading json file ...')
     fileService.sendFile(fullname,
         json.dumps(q_dict, ensure_ascii=False).encode()
+        # json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
     )
 
     setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
