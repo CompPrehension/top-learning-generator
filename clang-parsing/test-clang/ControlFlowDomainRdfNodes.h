@@ -212,6 +212,10 @@ public:
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
+	string& getText() {
+		return text;
+	}
+
 private:
 	string text;
 };
@@ -223,8 +227,8 @@ private:
 class ControlFlowDomainStmtRdfNode : public ControlFlowDomainLinkedRdfNode
 {
 public:
-	ControlFlowDomainStmtRdfNode(int id, string text)
-		: ControlFlowDomainLinkedRdfNode("stmt", id), text(text)
+	ControlFlowDomainStmtRdfNode(int id, string text, vector<string> additionalClasses = {})
+		: ControlFlowDomainLinkedRdfNode("stmt", id), text(text), additionalClasses(additionalClasses)
 	{
 	}
 
@@ -239,7 +243,10 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
 		if (this->isLast())
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
-		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";
+		for (auto& cl : additionalClasses) {
+			ss << string(attributesOffest + 4, ' ') << cl << " \n";
+		}
+		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";		
 		if (this->getNext())
 			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
 		if (this->getIndex() >= 0)
@@ -248,8 +255,9 @@ public:
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
-private:
+protected:
 	string text;
+	vector<string> additionalClasses;
 };
 
 
@@ -664,9 +672,59 @@ private:
 };
 
 
+class ControlFlowDomainBreakStmtRdfNode : public ControlFlowDomainStmtRdfNode
+{
+public:
+	ControlFlowDomainBreakStmtRdfNode(int id)
+		: ControlFlowDomainStmtRdfNode(id, "break", { ":break" })
+	{
+	}
+};
 
+class ControlFlowDomainContinueStmtRdfNode : public ControlFlowDomainStmtRdfNode
+{
+public:
+	ControlFlowDomainContinueStmtRdfNode(int id)
+		: ControlFlowDomainStmtRdfNode(id, "continue", { ":continue" })
+	{
+	}
+};
 
+class ControlFlowDomainReturnStmtRdfNode : public ControlFlowDomainStmtRdfNode
+{
+public:
+	ControlFlowDomainReturnStmtRdfNode(int id, string exprText)
+		: ControlFlowDomainStmtRdfNode(id, exprText.size() ? ("return " + exprText) : "return", {":return"}), exprText(exprText)
+	{
+	}
 
+	virtual void toString(stringstream& ss)
+	{
+		auto nodeRef = this->getNodeRef();
+		auto attributesOffest = nodeRef.size() + 1;
+
+		ss << "\n";
+		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
+		if (this->isFirst())
+			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
+		if (this->isLast())
+			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		for (auto& cl : additionalClasses) {
+			ss << string(attributesOffest + 4, ' ') << cl << " \n";
+		}
+		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";		
+		if (this->getNext())
+			ss << string(attributesOffest, ' ') << ":next " << this->getNext()->getNodeRef() << " ;\n";
+		if (this->getIndex() >= 0)
+			ss << string(attributesOffest, ' ') << ":item_index " << this->getIndex() << " ;\n";
+		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
+		ss << string(attributesOffest, ' ') << ":return_expr \"" << turtleStringEncode(exprText) << "\"^^xsd:string ;\n";
+		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
+	}
+
+private:
+	string exprText;
+};
 
 
 

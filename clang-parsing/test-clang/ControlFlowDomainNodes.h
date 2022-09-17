@@ -233,7 +233,7 @@ public:
 			if (result)
 				this->complexity = ControlFlowCycleComplexity::InfiniteTimes();
 			else
-				this->complexity = ControlFlowCycleComplexity::NonZeroTimes();
+				this->complexity = ControlFlowCycleComplexity::OneTime();
 
 			Logger::info("Pattern matched - new complexity = " + this->complexity.to_string());
 
@@ -477,6 +477,30 @@ public:
 	ControlFlowDomainExprStmtNode* getExpr() { return this->expr; }
 private:
 	ControlFlowDomainExprStmtNode* expr;
+};
+
+class ControlFlowDomainBreakStmtNode : public ControlFlowDomainStmtNode
+{
+public:
+	ControlFlowDomainBreakStmtNode(BreakStmt* astNode)
+		: ControlFlowDomainStmtNode(astNode)
+	{
+	}
+	~ControlFlowDomainBreakStmtNode()
+	{		
+	}
+};
+
+class ControlFlowDomainContinueStmtNode : public ControlFlowDomainStmtNode
+{
+public:
+	ControlFlowDomainContinueStmtNode(ContinueStmt* astNode)
+		: ControlFlowDomainStmtNode(astNode)
+	{
+	}
+	~ControlFlowDomainContinueStmtNode()
+	{
+	}
 };
 
 class ControlFlowDomainFuncDeclNode

@@ -40,7 +40,7 @@ Process RunCmdProcess(string pathToExe, string args)
 // 
 var finalFolder = new DirectoryInfo(Path.Combine(outputPath, "__result"));
 finalFolder.Create();
-var filePattern = new Regex(@"^(?<name>\w+)__(?<hash>\d+)__(?<date>\d+)\.ttl$", RegexOptions.Compiled);
+var filePattern = new Regex(@"^(?<name>.+)__(?<hash>\d+)__(?<date>\d+)(__)?\.ttl$", RegexOptions.Compiled);
 foreach (var repo in repos)
 {
 	var folderPath = Path.Combine(outputPath, repo.Name);
@@ -55,15 +55,16 @@ foreach (var repo in repos)
 		var name = match.Groups["name"];
 		var hash = match.Groups["hash"];
 
-		if (finalFolder.GetFiles($"{name}__{hash}__*.ttl").Length == 0)
+		if (finalFolder.GetFiles($"{name}__{hash}__*.ttl").Length == 0 && Directory.GetFiles(folderPath, $"{shortFileName}.log.txt").Length > 0)
 		{
 			File.Copy(file, Path.Combine(finalFolder.FullName, shortFileName));
 			File.Copy(file + ".log.txt", Path.Combine(finalFolder.FullName, shortFileName + ".log.txt"));
-			$"Moved file {shortFileName}".Dump();
+			//$"Moved file {shortFileName}".Dump();
 		}
 		else 
 		{
-			$"Collusion found for file {shortFileName}".Dump();
+			//$"Collision found for file {shortFileName}".Dump();
 		}
 	}
+	$"Processed repo {repo.FullName}".Dump();
 }

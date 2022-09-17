@@ -6,7 +6,7 @@
 
 using namespace std;
 
-BETTER_ENUM(ControlFlowCycleComplexityType, int, Undefined, NTimes, NonZeroTimes, ZeroTimes, InfiniteTimes)
+BETTER_ENUM(ControlFlowCycleComplexityType, int, Undefined, NTimes, NonZeroTimes, ZeroTimes, OneTime, InfiniteTimes)
 
 struct Range
 {
@@ -30,6 +30,9 @@ public:
 	}
 	static ControlFlowCycleComplexity ZeroTimes() {
 		return ControlFlowCycleComplexity(ControlFlowCycleComplexityType::ZeroTimes);
+	}
+	static ControlFlowCycleComplexity OneTime() {
+		return ControlFlowCycleComplexity(ControlFlowCycleComplexityType::OneTime);
 	}
 	static ControlFlowCycleComplexity InfiniteTimes() {
 		return ControlFlowCycleComplexity(ControlFlowCycleComplexityType::InfiniteTimes);

@@ -94,6 +94,16 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 		auto expr = mapExprToControlflowDst(returnStmt->getRetValue());
 		return new ControlFlowDomainReturnStmtNode(returnStmt, expr);
 	}
+	if (auto breakStmt = dyn_cast<clang::BreakStmt>(stmt))
+	{
+		Logger::info("Found break stmt");
+		return new ControlFlowDomainBreakStmtNode(breakStmt);
+	}
+	if (auto continueStmt = dyn_cast<clang::ContinueStmt>(stmt))
+	{
+		Logger::info("Found continue stmt");
+		return new ControlFlowDomainContinueStmtNode(continueStmt);
+	}
 	if (auto exprStmt = dyn_cast<clang::Expr>(stmt))
 	{
 		Logger::info("Found expr stmt");
@@ -271,6 +281,18 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 				throw string("Invalid expr");
 			ss << ";\n";
 		}
+		return;
+	}
+	if (auto node = dynamic_cast<ControlFlowDomainBreakStmtNode*>(stmt))
+	{
+		printTabs(ss, recursionLevel, insertSpaces);
+		ss << "break;\n";
+		return;
+	}
+	if (auto node = dynamic_cast<ControlFlowDomainContinueStmtNode*>(stmt))
+	{
+		printTabs(ss, recursionLevel, insertSpaces);
+		ss << "continue;\n";
 		return;
 	}
 	if (auto node = dynamic_cast<ControlFlowDomainVarDeclStmtNode*>(stmt))
@@ -524,9 +546,44 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 
 		return new ControlFlowDomainForRdfNode(++idGenerator, castedNode->getComplexity(), initRdf, exprRdf, incRdf, bodyRdf);
 	}
+	if (auto castedNode = dynamic_cast<ControlFlowDomainBreakStmtNode*>(node))
+	{
+		auto val = new ControlFlowDomainBreakStmtRdfNode(++idGenerator);
+		if (forceToSeq)
+		{
+			vector<ControlFlowDomainLinkedRdfNode*> body;
+			body.push_back(val);
+			val->setFirst();
+			val->setLast();
+			val->setIndex(0);
+			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
+		}
+		else
+		{
+			return val;
+		}
+	}
+	if (auto castedNode = dynamic_cast<ControlFlowDomainContinueStmtNode*>(node))
+	{
+		auto val = new ControlFlowDomainContinueStmtRdfNode(++idGenerator);
+		if (forceToSeq)
+		{
+			vector<ControlFlowDomainLinkedRdfNode*> body;
+			body.push_back(val);
+			val->setFirst();
+			val->setLast();
+			val->setIndex(0);
+			return new ControlFlowDomainSequenceRdfNode(++idGenerator, body);
+		}
+		else
+		{
+			return val;
+		}
+	}
 	if (auto castedNode = dynamic_cast<ControlFlowDomainReturnStmtNode*>(node))
 	{
-		auto val = new ControlFlowDomainStmtRdfNode(++idGenerator, getAstRawString(node->getAstNode(), mgr) + ";");
+		auto exprStr = castedNode->getExpr() && castedNode->getExpr()->getAstNode() ? getAstRawString(castedNode->getExpr()->getAstNode(), mgr) : "";
+		auto val = new ControlFlowDomainReturnStmtRdfNode(++idGenerator, exprStr);
 		if (forceToSeq)
 		{
 			vector<ControlFlowDomainLinkedRdfNode*> body;

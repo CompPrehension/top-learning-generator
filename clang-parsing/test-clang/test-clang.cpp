@@ -63,7 +63,7 @@ private:
             auto normalizedExpressionStr = dstNode->toString();
             auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
             auto rdfString = rdfTreeToString(rdfTree);
-            std::cout << normalizedExpressionStr << "\n";
+            // std::cout << normalizedExpressionStr << "\n";\
 
             auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
             auto time = std::time(0);
@@ -71,15 +71,19 @@ private:
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
             // if file with this name already exists - skip this function
-            string outputDir = "C:\\Users\\Admin\\Desktop\\test-clang\\test-clang\\expressionoutput\\";
+            string outputDir = GlobalOutputPath;
+            if (!outputDir.empty() && outputDir.back() != '\\')
+                outputDir += '\\';
             if (fileExists(outputDir, fileNamePart))
             {
                 return;
             }
 
-            string filename = outputDir + fileNamePart + "__" + to_string(time) + "__" + ".ttl";
+            string filename = outputDir + fileNamePart + "__" + to_string(time) + ".ttl";
             std::ofstream file(filename);
-            file << "# Original expresson\n";
+            //file << "# Original expresson\n";
+            //file << "# " << stringReplace(stringReplace(stringReplace(rawExpr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
+            file << "# Normalized expression\n";
             file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
             file << "# " << "hash=" << expressionHash << "\n";
             file << "\n\n";
@@ -192,6 +196,8 @@ private:
 int main(int argc, const char** argv) {
 
     GlobalOutputPath = string(argv[argc - 1]);
+    if (!std::filesystem::exists(GlobalOutputPath))
+        throw new string("The last arg should be valid output folder path");
 
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
     if (!ExpectedParser) {
@@ -207,6 +213,9 @@ int main(int argc, const char** argv) {
 
     auto exressionDomainMatcher = expr(
         anyOf(
+            binaryOperator(hasOperatorName("&&")),
+            binaryOperator(hasOperatorName("||")),
+            unaryOperator(hasOperatorName("!")),
             binaryOperator(hasOperatorName("+")),
             binaryOperator(hasOperatorName("-")),
             binaryOperator(hasOperatorName("*")),
@@ -219,13 +228,13 @@ int main(int argc, const char** argv) {
             cxxMemberCallExpr()
         )
     ).bind("exressionDomain");
-    auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
-        .bind("cntrlflowDomain");
+    //auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
+    //    .bind("cntrlflowDomain");
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }

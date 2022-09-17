@@ -39,7 +39,6 @@ void isValidNodeInner(ExpressionDomainNode* node, bool& _isValid, int& operators
     }
     if (auto tmp = dynamic_cast<ExpressionDomainVarNode*>(node))
     {
-        isValidNodeInner(tmp->getInit(), _isValid, operatorsCount);
         return;
     }
     if (auto tmp = dynamic_cast<ExpressionDomainFuncCallNode*>(node))
@@ -158,9 +157,19 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     }
     if (auto membExpr = dyn_cast<clang::MemberExpr>(node))
     {
-        auto left = mapToDst(membExpr->getBase(), sourceMgr);
+        
         auto right = membExpr->getMemberDecl()->getNameAsString();
+        if (right._Starts_with("ipv4"))
+        {
+            int x = 0;
+            membExpr->dump();
+        }
 
+        Expr* leftAstNode;
+        do {
+            leftAstNode = membExpr->getBase();
+        } while (isa<clang::MemberExpr>(leftAstNode));
+        auto left = mapToDst(leftAstNode, sourceMgr);
         return new ExpressionDomainMemberExprNode((clang::MemberExpr*)membExpr, left, right);
     }
     if (auto arr_sub_expr = dyn_cast<clang::ArraySubscriptExpr>(node))
@@ -282,8 +291,9 @@ void mapToExressionDomainRdfNodes(ExpressionDomainNode* node, vector<ExpressionD
     if (auto tmp = dynamic_cast<ExpressionDomainConditionalOperatorNode*>(node))
     {
         mapToExressionDomainRdfNodes(tmp->getExpr(), acc, index);
-        acc.push_back(ExpressionDomainRdfNode("operator", "?:", ++index));
+        acc.push_back(ExpressionDomainRdfNode("operator", "?", ++index));
         mapToExressionDomainRdfNodes(tmp->getLeft(), acc, index);
+        acc.push_back(ExpressionDomainRdfNode("operator", ":", ++index));
         mapToExressionDomainRdfNodes(tmp->getRight(), acc, index);
         return;
     }
