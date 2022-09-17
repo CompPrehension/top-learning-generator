@@ -149,7 +149,7 @@
     <ClCompile Include="cntrl-flow-domain-funtions.cpp" />
     <ClCompile Include="expression-domain-functions.cpp" />
     <ClCompile Include="helpers.cpp" />
-    <ClCompile Include="test-clang.cpp" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cntrl-flow-domain-funtions.h" />

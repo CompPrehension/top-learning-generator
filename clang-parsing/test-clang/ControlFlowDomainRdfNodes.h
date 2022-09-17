@@ -25,6 +25,10 @@ public:
 		return ss.str();
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+
+	}
+
 	virtual void toString(stringstream& ss) = 0;
 
 	string& getNodeName() {
@@ -79,6 +83,13 @@ public:
 
 	int getIndex() { return index; }
 	void setIndex(int idx) { index = idx; }
+
+	virtual void fillConcepts(vector<string>& accum) {
+		auto current = next;
+		while (current != NULL) {
+			current->fillConcepts(accum);
+		}
+	}
 
 private:
 	bool _isFirst;
@@ -145,6 +156,14 @@ public:
 		}
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		for (auto c : this->body)
+		{
+			if (c)
+				c->fillConcepts(accum);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainLinkedRdfNode*> body;
 };
@@ -174,9 +193,26 @@ public:
 		auto nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
+		vector<string> algConcepts;
+		fillConcepts(algConcepts);
+		std::sort(algConcepts.begin(), algConcepts.end());
+		algConcepts.erase(unique(algConcepts.begin(), algConcepts.end()), algConcepts.end());
+
 		ss << "\n";
 		ss << this->getNodeRef() << " rdf:type " << ControlFlowDomainRdfNode::type + " ,\n";
 		ss << string(attributesOffest + 4, ' ') << ":algorithm ;\n";
+		if (algConcepts.size())
+		{
+			ss << string(attributesOffest, ' ') << ":has_concept ";
+			for (int i = 0; i < algConcepts.size(); ++i)
+			{
+				ss << "\"" << algConcepts[i] << "\"";
+				if (i != algConcepts.size() - 1)
+					ss << ",";
+				ss << " ;\n";
+			}
+		}
+		
 		ss << string(attributesOffest, ' ') << ":entry_point " << this->getSequence()->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":global_code " << this->getSequence()->getNodeRef() << " ;\n";
 		ss << string(attributesOffest, ' ') << ":algorithm_name \"" << turtleStringEncode(this->algorithmName) << "\"^^xsd:string; \n";
@@ -184,6 +220,11 @@ public:
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << this->getNodeName() << "\"^^xsd:string .\n";
 
 		this->getSequence()->toString(ss);
+	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		if (sequence)
+			sequence->fillConcepts(accum);
 	}
 
 private:
@@ -216,8 +257,33 @@ public:
 		return text;
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		auto concepts = ConceptsFromExpr(text);
+		accum.insert(accum.end(), concepts.begin(), concepts.end());
+	}
+
+	static vector<string> ConceptsFromExpr(string expr) {
+		vector<string> result;
+		static const std::regex arrayConceptMatchingRegex(R"~([\[\]])~");
+		if (std::regex_search(expr, arrayConceptMatchingRegex)) {
+			result.push_back("expr:array");
+		}
+
+		static const std::regex pointerConceptMatchingRegex(R"~([*&])~");
+		if (std::regex_search(expr, pointerConceptMatchingRegex)) {
+			result.push_back("expr:pointer");
+		}
+
+		static const std::regex fieldAcceessConceptMatchingRegex(R"~(\.|\-\>)~");
+		if (std::regex_search(expr, fieldAcceessConceptMatchingRegex)) {
+			result.push_back("expr:class_field_access");
+		}
+		return result;
+	}
+
 private:
 	string text;
+	vector<string> concepts;
 };
 
 
@@ -255,6 +321,11 @@ public:
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		auto concepts = ControlFlowDomainExprRdfNode::ConceptsFromExpr(text);
+		accum.insert(accum.end(), concepts.begin(), concepts.end());
+	}
+
 protected:
 	string text;
 	vector<string> additionalClasses;
@@ -281,6 +352,11 @@ public:
 
 	ControlFlowDomainSequenceRdfNode* getBody() {
 		return body;
+	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		if (body)
+			body->fillConcepts(accum);
 	}
 
 private:
@@ -329,6 +405,11 @@ public:
 		this->getBody()->toString(ss);
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		if (expr)
+			expr->fillConcepts(accum);
+	}
+
 private:
 	ControlFlowDomainExprRdfNode* expr;
 };
@@ -371,6 +452,11 @@ public:
 
 		this->expr->toString(ss);
 		this->getBody()->toString(ss);
+	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		if (expr)
+			expr->fillConcepts(accum);
 	}
 
 private:
@@ -429,6 +515,15 @@ public:
 		if (this->inc)
 			this->inc->toString(ss);
 		this->getBody()->toString(ss);
+	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		if (init)
+			init->fillConcepts(accum);
+		if (expr)
+			expr->fillConcepts(accum);
+		if (inc)
+			inc->fillConcepts(accum);
 	}
 
 private:
@@ -495,6 +590,13 @@ public:
 		}
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		for (int i = 0; i < this->alternatives.size(); ++i)
+		{
+			alternatives[i]->fillConcepts(accum);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives;
 };
@@ -552,6 +654,17 @@ public:
 			ch->toString(ss);
 		}
 	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		if (expr)
+			expr->fillConcepts(accum);
+		for (auto c : this->body)
+		{
+			if (c)
+				c->fillConcepts(accum);
+		}
+	}
+
 
 private:
 	ControlFlowDomainExprRdfNode* expr;
@@ -611,6 +724,16 @@ public:
 		}
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		if (expr)
+			expr->fillConcepts(accum);
+		for (auto c : this->body)
+		{
+			if (c)
+				c->fillConcepts(accum);
+		}
+	}
+
 
 private:
 	ControlFlowDomainExprRdfNode* expr;
@@ -667,6 +790,14 @@ public:
 		}
 	}
 
+	virtual void fillConcepts(vector<string>& accum) {
+		for (auto c : this->body)
+		{
+			if (c)
+				c->fillConcepts(accum);
+		}
+	}
+
 private:
 	vector<ControlFlowDomainLinkedRdfNode*> body;
 };
@@ -720,6 +851,11 @@ public:
 		ss << string(attributesOffest, ' ') << ":id " << this->id << " ;\n";
 		ss << string(attributesOffest, ' ') << ":return_expr \"" << turtleStringEncode(exprText) << "\"^^xsd:string ;\n";
 		ss << string(attributesOffest, ' ') << ":stmt_name \"" << turtleStringEncode(this->text) << "\"^^xsd:string .\n";
+	}
+
+	virtual void fillConcepts(vector<string>& accum) {
+		auto concepts = ControlFlowDomainExprRdfNode::ConceptsFromExpr(text);
+		accum.insert(accum.end(), concepts.begin(), concepts.end());
 	}
 
 private:

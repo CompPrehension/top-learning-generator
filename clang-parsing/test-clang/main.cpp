@@ -211,6 +211,7 @@ int main(int argc, const char** argv) {
     ClangTool Tool(OptionsParser.getCompilations(),
         OptionsParser.getSourcePathList());
 
+    /*
     auto exressionDomainMatcher = expr(
         anyOf(
             binaryOperator(hasOperatorName("&&")),
@@ -228,13 +229,14 @@ int main(int argc, const char** argv) {
             cxxMemberCallExpr()
         )
     ).bind("exressionDomain");
-    //auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
-    //    .bind("cntrlflowDomain");
+    */
+    auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
+        .bind("cntrlflowDomain");
 
     ExprPrinter Printer;
     MatchFinder Finder;
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }
