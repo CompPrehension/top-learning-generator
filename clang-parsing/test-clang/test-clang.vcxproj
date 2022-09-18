@@ -153,6 +153,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cntrl-flow-domain-funtions.h" />
+    <ClInclude Include="ControlFlowConcept.h" />
     <ClInclude Include="ControlFlowCycleComplexity.h" />
     <ClInclude Include="ControlFlowDomainNodes.h" />
     <ClInclude Include="ControlFlowDomainRdfNodes.h" />

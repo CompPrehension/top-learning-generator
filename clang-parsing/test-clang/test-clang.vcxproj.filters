@@ -77,5 +77,8 @@
     <ClInclude Include="enum.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="ControlFlowConcept.h">
+      <Filter>Файлы заголовков\cntrl-flow-domain</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

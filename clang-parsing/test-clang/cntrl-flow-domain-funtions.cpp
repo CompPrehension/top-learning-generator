@@ -24,6 +24,14 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	if (stmt == nullptr)
 		return nullptr;
 
+	/*
+	if (stmt->getSourceRange().getBegin().isMacroID() || stmt->getSourceRange().getEnd().isMacroID())
+	{
+		Logger::warn("Found macro stmt with ast below");
+		goto dump_and_return_undefined;
+	}
+	*/
+
 	if (auto compoundStmt = dyn_cast<clang::CompoundStmt>(stmt))
 	{
 		Logger::info("Found CompoundStmt");
@@ -111,11 +119,12 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 	}
 
 	Logger::warn("Found undefined stmt with ast");
+
+dump_and_return_undefined:
 	string stmtNodeDump;
 	raw_string_ostream output(stmtNodeDump);
 	stmt->dump(output, astCtx);
 	Logger::warn(stmtNodeDump);
-
 	return new ControlFlowDomainUndefinedStmtNode(stmt);
 }
 
@@ -633,6 +642,6 @@ ControlFlowDomainAlgorythmRdfNode* mapToRdfNode(string algUniqueName, ControlFlo
 {
 	int id = 0;
 	auto funcBody = mapToRdfNode(node->getBody(), id, mgr, astCtx, true);
-	return new ControlFlowDomainAlgorythmRdfNode(algUniqueName, ++id, (ControlFlowDomainSequenceRdfNode*)funcBody);
+	return new ControlFlowDomainAlgorythmRdfNode(algUniqueName, ++id, (ControlFlowDomainSequenceRdfNode*)funcBody, node->getBody()->calcConcepts());
 }
 

@@ -4,8 +4,10 @@
 #include "clang/AST/ASTContext.h"
 #include <llvm/Support/CommandLine.h>
 #include <clang/Lex/Lexer.h>
+#include "ControlFlowConcept.h"
 #include "ControlFlowCycleComplexity.h"
 #include "Logger.h"
+#include <unordered_set>
 
 using namespace std;
 using namespace clang;
@@ -26,7 +28,85 @@ public:
 	{
 	}
 	Stmt* getAstNode() { return this->astNode; };
+
+	unordered_set<ControlFlowConcept, ControlFlowConceptHash> calcConcepts() {
+		unordered_set<ControlFlowConcept, ControlFlowConceptHash> result;
+		CaclConcepts(astNode, result);
+		return result;
+	}
+
 private:
+	static void CaclConcepts(Stmt* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash> & concepts) {
+		for (auto* ch : astNode->children()) {
+			if (!ch)
+				continue;
+
+			if (auto expr = dyn_cast<Expr>(ch)) {
+				CaclConcepts(expr, concepts);
+			}
+			else if (auto decl = dyn_cast<DeclStmt>(ch)) {
+				CaclConcepts(decl, concepts);
+			}
+
+			CaclConcepts(ch, concepts);
+		}
+	}
+
+	static void CaclConcepts(DeclStmt* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash>& concepts) {
+		for (auto* decl : astNode->decls()) {
+			if (auto* varDecl = dyn_cast<VarDecl>(decl)) {
+				// auto declString = (varDecl != NULL) ? varDecl->getType().getAsString() : "";
+				bool isArray = varDecl->getType().getTypePtr()->isArrayType();
+				bool isPointer = varDecl->getType().getTypePtr()->isPointerType();
+				if (isArray) {
+					concepts.insert(ControlFlowConcept::Array);
+				}
+				if (isPointer) {
+					concepts.insert(ControlFlowConcept::Pointer);
+				}
+			}
+		}
+	}
+
+	static void CaclConcepts(Expr* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash>& concepts) {
+		bool containsArrayBrNode = false;
+		bool containsMemberAccess = false;
+		bool containsPtr = false;
+		bool containsFuncCall = false;
+		bool containsExplicitCast = false;
+
+		for (auto* ch : astNode->children()) {
+			containsArrayBrNode = containsArrayBrNode || dyn_cast<clang::ArraySubscriptExpr>(ch);
+			containsMemberAccess = containsMemberAccess || dyn_cast<clang::MemberExpr>(ch);
+			containsFuncCall = containsFuncCall || dyn_cast<clang::CallExpr>(ch);
+			containsExplicitCast = containsExplicitCast || dyn_cast<clang::CStyleCastExpr>(ch);
+
+			auto chAsUnary = dyn_cast<clang::UnaryOperator>(ch);
+			containsPtr = containsPtr || (chAsUnary && (chAsUnary->getOpcode() == UnaryOperatorKind::UO_AddrOf || chAsUnary->getOpcode() == UnaryOperatorKind::UO_Deref));
+		}
+
+		if (containsArrayBrNode)
+		{
+			concepts.insert(ControlFlowConcept::Array);
+		}
+		if (containsMemberAccess)
+		{
+			concepts.insert(ControlFlowConcept::ClassMemberAccess);
+		}
+		if (containsFuncCall)
+		{
+			concepts.insert(ControlFlowConcept::FuncCall);
+		}
+		if (containsPtr)
+		{
+			concepts.insert(ControlFlowConcept::Pointer);
+		}
+		if (containsExplicitCast)
+		{
+			concepts.insert(ControlFlowConcept::ExplicitCast);
+		}
+	}
+
 	Stmt* astNode;
 };
 
@@ -66,7 +146,7 @@ class ControlFlowDomainExprStmtNode : public ControlFlowDomainStmtNode
 public:
 	ControlFlowDomainExprStmtNode(Expr* astNode)
 		: ControlFlowDomainStmtNode(astNode)
-	{
+	{		
 	}
 };
 
@@ -76,7 +156,7 @@ class ControlFlowDomainIfStmtPart
 public:
 	ControlFlowDomainIfStmtPart(IfStmt* astNode, ControlFlowDomainExprStmtNode* expr, ControlFlowDomainStmtNode* thenBody)
 		: astNode(astNode), expr(expr), thenBody(thenBody)
-	{
+	{		
 	}
 	~ControlFlowDomainIfStmtPart()
 	{
@@ -102,7 +182,7 @@ class ControlFlowDomainIfStmtNode : public ControlFlowDomainStmtNode
 public:
 	ControlFlowDomainIfStmtNode(vector<ControlFlowDomainIfStmtPart*> ifParts, ControlFlowDomainStmtNode* elseBody)
 		: ControlFlowDomainStmtNode(ifParts[0]->getAstNode()), ifParts(ifParts), elseBody(elseBody)
-	{
+	{		
 	}
 	~ControlFlowDomainIfStmtNode()
 	{
@@ -118,6 +198,7 @@ public:
 	ControlFlowDomainExprStmtNode* getOriginalExpr() { return this->ifParts[0]->getExpr(); }
 	vector<ControlFlowDomainIfStmtPart*>& getIfParts() { return this->ifParts; }
 	ControlFlowDomainStmtNode* getElseBody() { return this->elseBody; }
+
 private:
 	vector<ControlFlowDomainIfStmtPart*> ifParts;
 	ControlFlowDomainStmtNode* elseBody;
