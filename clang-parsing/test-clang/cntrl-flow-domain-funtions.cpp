@@ -48,7 +48,7 @@ ControlFlowDomainStmtNode* mapToControlflowDst(Stmt* stmt, ASTContext& astCtx)
 		bool isAllVarDecl = true;
 		for (auto childDecl : declStmt->getDeclGroup())
 		{
-			isAllVarDecl = isAllVarDecl && isa<clang::VarDecl>(childDecl);
+			isAllVarDecl = isAllVarDecl && (isa<clang::VarDecl>(childDecl) || isa<clang::RecordDecl>(childDecl));
 		}
 		if (isAllVarDecl)
 			return new ControlFlowDomainVarDeclStmtNode(declStmt);

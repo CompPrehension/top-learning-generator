@@ -256,8 +256,11 @@ public:
 			ss << string(attributesOffest + 4, ' ') << ":first_item ,\n";
 		if (this->isLast())
 			ss << string(attributesOffest + 4, ' ') << ":last_item ,\n";
+		int idx = 0;
 		for (auto& cl : additionalClasses) {
-			ss << string(attributesOffest + 4, ' ') << cl << " \n";
+			ss << string(attributesOffest + 4, ' ') << cl;
+			ss << ((idx != additionalClasses.size() - 1) ? ",\n" : "\n");
+			idx++;
 		}
 		ss << string(attributesOffest + 4, ' ') << ":stmt ;\n";		
 		if (this->getNext())
