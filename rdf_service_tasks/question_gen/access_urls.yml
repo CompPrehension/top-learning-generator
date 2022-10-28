@@ -6,6 +6,12 @@ ftp_base: "c:/data/compp/control_flow/"
 ftp_download_base: "c:/data/compp/control_flow/"
 
 
+fuseki_host: null
+rdf_db_name: cf_pi
+query_url:  "http://localhost:7200/repositories/cf_pi"
+update_url: "http://localhost:7200/repositories/cf_pi/statements"
+
+
 ###  Triple stores  ###
 
 

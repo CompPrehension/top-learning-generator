@@ -31,11 +31,14 @@ if 0:
     # just for debugger to see the code in different directory
     from ....c_owl.ctrlstrct_test import make_question_dict_for_alg_json
 from ctrlstrct_test import make_question_dict_for_alg_json
+### inspecting loading of qG
+from common_helpers import Checkpointer
 
 
 # using patched version of SPARQLBurger
 from SPARQLBurger.SPARQLQueryBuilder import *
 
+print('imports completed.')
 
 # Global variables
 CONFIG = None
@@ -45,6 +48,7 @@ INIT_GLOBALS = True
 # PREFETCH_QUESTIONS = False
 PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
 DUMP_QUESTION_GRAPH_TO_FILE = False
+# DUMP_QUESTION_GRAPH_TO_FILE = True  # and exit immediately!
 GATHER_DB_SIZE_INFO = False
 
 qG = None  # guestions graph (pre-fetched)
@@ -78,7 +82,7 @@ def _get_rdfdb_stats_collectors():
     'init StateWatcher to watch dataset size on disk as well as number of triples in th dataset.'
 
     if not GATHER_DB_SIZE_INFO:
-    	return ()
+        return ()
 
     from misc.watch_rdf_db import StateWatcher
     from misc.dir_stat import dir_size
@@ -278,11 +282,23 @@ WHERE { GRAPH <%s> {
 } }
 '''
 
-def fetchGraph(gUri: str):
+def fetchGraph(gUri: str, verbose=False):
+    format_request, format_parse = "turtle", 'n3'
+    # format_request, format_parse = "rdfxml", None  # , 'application/rdf+xml'
     q = CONSTRUCT_PATTERN % gUri
-    query_result = sparql_endpoint.query(q, return_format="turtle")
-    query_results = b''.join(list(query_result))
-    g = Graph().parse(format='n3', data=query_results)
+    ch = Checkpointer()
+    if verbose: print('   fetchGraph: requesting data ...')
+    query_result = sparql_endpoint.query(q, return_format=format_request)
+    if verbose: ch.hit('fetchGraph: data requested')
+    if format_parse:
+        query_results = b''.join(list(query_result))
+        if verbose: ch.hit('fetchGraph: collected query results')
+        g = Graph().parse(format=format_parse, data=query_results)
+        if verbose: ch.hit('parsed n3')
+        # g = Graph(store="Oxigraph").parse(format='application/rdf+xml', data=query_results)
+    else:
+        g = query_result
+    if verbose: ch.since_start('fetchGraph: done in:')
     return g
 
 # q_graph = fetchGraph(NS_questions.base())
@@ -291,16 +307,22 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS:
     # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
-    qUri = NS_questions.base()
-    ## qUri = 'http://vstu.ru/poas/selected_questions'
-    qG = fetchGraph(qUri)
+    if False:
+	    qUri = NS_questions.base()
+    else:
+	    ## qUri = 'http://vstu.ru/poas/selected_questions'
+	    qUri = 'http://vstu.ru/poas/questions_only'
+	    print('Fetching graph as specified:', qUri)
+    qG = fetchGraph(qUri, verbose=True)
 
     if DUMP_QUESTION_GRAPH_TO_FILE:
         ###
         # dump_qG_to = CONFIG.ftp_base + CONFIG.rdf_db_name + '.ttl'
         dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
         qG.serialize(dump_qG_to, format='turtle')
-        print(len(qG), "triples are already exist.")
+        print(len(qG), f"triples saved to file: {dump_qG_to}")
+        print('Bye for now!')
+        exit()
 
 
 # def getFullTemplate(name):
@@ -381,7 +403,32 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
     ### print(upd_setGraph)
 
     res = sparql_endpoint.update(upd_setGraph)
-    print('      SPARQL: set question subgraph response code:', res.response.code)
+    print('      SPARQL: set question subgraph response-code:', res.response.code)
+
+    if model:
+	    # copy has_concept relations to metadata graph (into questions/ NS) ...
+	    has_concept = rdflib.term.URIRef(NS_code.get("has_concept"))
+
+	    # None ??? >>
+	    concepts = extract_graph_values(model, subject=None, predicate=has_concept)
+	    has_concept_qs = rdflib.term.URIRef(NS_questions.get("has_concept")).n3()
+	    insert_concepts_query = makeInsertTriplesQuery(
+	        named_graph=rdflib.term.URIRef(NS_questions.base()).n3(),
+	        triples=[
+	                (questionNode.n3(),
+	                 has_concept_qs,
+	                 rdflib.term.Literal(concept_str).n3())
+	                for concept_str in concepts
+	            ]
+	    )
+	    res = sparql_endpoint.update(insert_concepts_query)
+	    print('      SPARQL: insert concepts query response-code:', res.response.code)
+
+
+def extract_graph_values(model: Graph, subject: rdflib.term.URIRef=None, predicate: rdflib.term.URIRef=None):
+    objs = model.objects(subject, predicate)
+    return [o.toPython() for o in objs]
+
 
 
 def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
@@ -398,15 +445,17 @@ __PATCH_TTL_RE = None
 def _patch_and_parse_ttl(opened_file):
     global __PATCH_TTL_RE
     if not __PATCH_TTL_RE:
-        __PATCH_TTL_RE = re.compile(r'(?:(?<=:return)|(?<=:break)|(?<=:continue))\s+:stmt')
+        __PATCH_TTL_RE = re.compile(r'((?<=:return)|(?<=:break)|(?<=:continue))(\s+:stmt)')
 
     data = opened_file.read()
-    data = __PATCH_TTL_RE.sub('', data)
+    data = __PATCH_TTL_RE.sub(lambda m: m[1] + ',' + m[2], data)  # insert ,
     g = Graph().parse(format='ttl', data=data.encode())
     return g
 
 
-def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024)):
+def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024), skip_first=0):
+    ''' ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
+    '''
 
     files_total = 0
     files_selected = 0
@@ -417,12 +466,16 @@ def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*10
             if not info.name.endswith(wanted_ext):
                 continue
             files_total += 1
+
+            if skip_first > 0 and files_total < skip_first:
+            	continue
+
             if file_size_filter and not(file_size_filter[0] <= info.size <= file_size_filter[1]):
                 continue
             files_selected += 1
 
-            # cut last two sections with digits
-            name = "_".join(info.name.split("__")[:-2])
+            # cut last section with digits (timestamp), cut last 12 digits from hash
+            name = "_".join(info.name.split("__")[:-1])[:-12]
             print('[%3d]' % files_selected, name, '...')
 
             qUri = createQuestionTemplate(name);
@@ -486,7 +539,7 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
     ### print(full_query); # exit()
 
     res = sparql_endpoint.update(full_query)
-    print('      SPARQL: create template response code:', res.response.code)
+    print('      SPARQL: create template response-code:', res.response.code)
 
     # cannot not update as quad insertion is not for a single graph
     # qG.update(full_query)
@@ -603,7 +656,7 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
     ### print(full_query); exit()
 
     res = sparql_endpoint.update(full_query)
-    print('      SPARQL: create question response code:', res.response.code)
+    print('      SPARQL: create question response-code:', res.response.code)
 
     # cannot not update as quad insertion is not for a single graph
     # qG.update(full_query)
@@ -846,6 +899,9 @@ def generate_questions_for_templates(offset=None, limit=None):
         print("Processing template: ", qtname)
         print("    (skipped so far: %d)" % skip_count)
         print("========")
+        if qtname in ('curl_mvsnprintf', ):
+        	print('intended skip.')
+        	continue
         try:
             questions_count += process_template(qtname, questions_count)
         except NotImplementedError as e:
@@ -975,7 +1031,7 @@ where {  GRAPH <http://vstu.ru/poas/questions> {
         concepts = ', '.join('"%s"' % s for s in concepts.split())
         query = insert_concept_query % (concepts, template_name)
         res = _sparql_endpoint.update(query)
-        print('      SPARQL: insert_concept response code:', res.response.code)
+        print('      SPARQL: insert_concept response-code:', res.response.code)
 
     print('Finished updating questions.')
 
@@ -1046,7 +1102,7 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
     for question_uri in sample:
         query = copy_question.replace("?s", '<%s>' % question_uri)
         res = sparql_endpoint.update(query)
-        print('      SPARQL: insert_concept response code:', res.response.code)
+        print('      SPARQL: insert_concept response-code:', res.response.code)
 
     print('Finished selecting questions.')
 
@@ -1205,7 +1261,10 @@ if __name__ == '__main__':
     print('Initializing...')
     # upload_templates(r'c:/Temp2/cf_v8-pre')
     # upload_templates(r'c:/Temp2/cf_v8')
+    # upload_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=5200)
+
     # make_questions__main()
+
     generate_data_for_questions(0, None)
 
     # add_concepts_from_list()

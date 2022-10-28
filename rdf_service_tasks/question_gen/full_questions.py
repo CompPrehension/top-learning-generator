@@ -169,6 +169,8 @@ def convert_graph_to_json(g):
             g.set((a,
                    gl(':act_name'),
                    stmt_name))
+        else:
+            print('no `stmt_name` for', a)
 
 
     g.bind('', NS_code.get()) # set namespace for gl
