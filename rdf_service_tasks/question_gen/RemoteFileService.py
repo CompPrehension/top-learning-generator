@@ -94,6 +94,9 @@ class RemoteFileService:
         print('    sendModel:', fullname)
         self.fs_upload.makedirs(fs.path.split(fullname)[0], recreate=True)
         self.fs_upload.writebytes(fullname, data)
+    def deleteFile(self, fullname):
+        print('    deleteFile:', fullname)
+        self.fs_upload.remove(fullname)
 
     def insertDummyDirs(self, filepath):
         if (self.dummyDirsForNewFile <= 0):

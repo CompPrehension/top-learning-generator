@@ -377,11 +377,12 @@ def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
         safe_value = False  # what to use in condition to avoid an infinite loop
         if (st, RDF.type, gl(':inverse_conditional_loop')) in g:  ### TODO: make sure of loop type
             safe_value = True
-        is_post_conditional = (st, RDF.type, gl(':start_with_body')) in g
+        is_post_conditional = (st, RDF.type, gl(':start_with_body')) in g  # -> bool
+        is_post_conditional = int(is_post_conditional)
         loop_complexity = g.value(st, gl(':loop_complexity'), None)
         # default unlimited count of iterations:
         min_iterations = 0
-        max_iterations = LOOP_MAX_ITERATIONS - int(is_post_conditional)
+        max_iterations = LOOP_MAX_ITERATIONS - is_post_conditional
         if loop_complexity:
             loop_complexity = loop_complexity.toPython()
             assert type(loop_complexity) is str, '`loop_complexity`: `str` type expected'
@@ -418,8 +419,9 @@ def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
                     pass
 
             elif loop_complexity == "OneTime":
-                min_iterations = 1
-                max_iterations = 1
+                # condition of 'do-while' loop should always evaluate to False
+                min_iterations = 1 - is_post_conditional
+                max_iterations = 1 - is_post_conditional
 
             elif loop_complexity == "Undefined":
                 pass  # anything possible
