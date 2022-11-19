@@ -45,10 +45,15 @@ CONFIG = None
 INIT_GLOBALS = True
 # INIT_GLOBALS = False
 
+# qG_URI = 'http://vstu.ru/poas/questions'  # required for question generation
+qG_URI = 'http://vstu.ru/poas/selected_questions'
+
 # PREFETCH_QUESTIONS = False
 PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
-DUMP_QUESTION_GRAPH_TO_FILE = False
-# DUMP_QUESTION_GRAPH_TO_FILE = True  # and exit immediately!
+# DUMP_QUESTION_GRAPH_TO_FILE = False
+DUMP_QUESTION_GRAPH_TO_FILE = True  # and exit immediately!
+REMOVE_TRIPLES_FOR_PRODUCTION = True  # only when saving graph to file
+
 GATHER_DB_SIZE_INFO = False
 
 qG = None  # guestions graph (pre-fetched)
@@ -126,7 +131,7 @@ if INIT_GLOBALS:
     )
 
     # See below:
-    # qG = fetchGraph(NS_questions.base())
+    # qG = fetchGraph(qG_URI)
 
 
 def makeUpdateTripleQuery(ng, s, p, o, prefixes=()):
@@ -210,7 +215,7 @@ def questionSubgraphPropertyFor(role: GraphRole) -> str:
 
 def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
     'get names of questions with `rdf:nil` set for specified graph'
-    ng = URI(NS_questions.base());
+    ng = URI(qG_URI);
 
     unsolvedTemplates = builder(SPARQLSelectQuery()
     ).add_prefix(
@@ -236,7 +241,7 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
 
 def templatesWithoutQuestions(limit=None) -> list:
     'get names of question templates without questions'
-    ng = URI(NS_questions.base());
+    ng = URI(qG_URI);
 
     lonelyTemplates = builder(SPARQLSelectQuery()
     ).add_prefix(
@@ -301,24 +306,48 @@ def fetchGraph(gUri: str, verbose=False):
     if verbose: ch.since_start('fetchGraph: done in:')
     return g
 
-# q_graph = fetchGraph(NS_questions.base())
-if INIT_GLOBALS and PREFETCH_QUESTIONS:
+# q_graph = fetchGraph(qG_URI)
+if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
     ### empty graph:
     # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
     if False:
-	    qUri = NS_questions.base()
+	    pass;  # qUri = qG_URI
     else:
-	    ## qUri = 'http://vstu.ru/poas/selected_questions'
-	    qUri = 'http://vstu.ru/poas/questions_only'
-	    print('Fetching graph as specified:', qUri)
-    qG = fetchGraph(qUri, verbose=True)
+	    ## qUri = 'http://vstu.ru/poas/questions_only'
+	    # qUri = 'http://vstu.ru/poas/selected_questions'
+	    # ! qG_URI !
+	    print('Fetching graph as specified:', qG_URI)
+    qG = fetchGraph(qG_URI, verbose=True)
 
     if DUMP_QUESTION_GRAPH_TO_FILE:
         ###
         # dump_qG_to = CONFIG.ftp_base + CONFIG.rdf_db_name + '.ttl'
         dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
+
+        if REMOVE_TRIPLES_FOR_PRODUCTION:
+        	# just remove unused properties (has_graph_*) from question nodes
+        	# before exporting to production env
+        	nsQ = 'http://vstu.ru/poas/questions/'
+        	prop_names = '''
+        	has_graph_q_s
+        	has_graph_q
+        	has_graph_qt
+        	has_graph_qt_s'''.split()
+
+        	i = 0
+        	for pn in prop_names:
+        	    p = rdflib.URIRef(pn, nsQ)
+        	    for s, o in qG.subject_objects(p):
+        	        qG.remove((s, p, o))
+        	        i += 1
+        	print("Removed %d triples from graph (for production)." % i)
+
+        # shorten length of serialized data
+        qG.bind('Q', 'http://vstu.ru/poas/questions/Question#')
+        qG.bind('QT', 'http://vstu.ru/poas/questions/QuestionTemplate#')
+        qG.bind('qs', 'http://vstu.ru/poas/questions/')
         qG.serialize(dump_qG_to, format='turtle')
         print(len(qG), f"triples saved to file: {dump_qG_to}")
         print('Bye for now!')
@@ -345,7 +374,7 @@ def questionStages():
 
 
 def findQuestionByName(questionName, questions_graph=qG):
-        qG = questions_graph or fetchGraph(NS_questions.base());
+        qG = questions_graph or fetchGraph(qG_URI);
         if qG:
             qNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionName))
             if qNode:
@@ -357,7 +386,7 @@ def findQuestionByName(questionName, questions_graph=qG):
 
 def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_ext=".ttl", fileService=fileService):
         # look for <Question>-<subgraph> relation in metadata first
-        qG = questions_graph or fetchGraph(NS_questions.base());
+        qG = questions_graph or fetchGraph(qG_URI);
         targetGraphUri = None
 
         if qG:
@@ -394,7 +423,7 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
     qgNode = NS_file.get(qgUri);
 
     upd_setGraph = makeUpdateTripleQuery(
-            rdflib.term.URIRef(NS_questions.base()).n3(),
+            rdflib.term.URIRef(qG_URI).n3(),
             questionNode.n3(),
             rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
             rdflib.term.URIRef(qgNode).n3()
@@ -413,7 +442,7 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
 	    concepts = extract_graph_values(model, subject=None, predicate=has_concept)
 	    has_concept_qs = rdflib.term.URIRef(NS_questions.get("has_concept")).n3()
 	    insert_concepts_query = makeInsertTriplesQuery(
-	        named_graph=rdflib.term.URIRef(NS_questions.base()).n3(),
+	        named_graph=rdflib.term.URIRef(qG_URI).n3(),
 	        triples=[
 	                (questionNode.n3(),
 	                 has_concept_qs,
@@ -432,9 +461,19 @@ def extract_graph_values(model: Graph, subject: rdflib.term.URIRef=None, predica
 
 
 def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
+    if topRole.ordinal() >= GraphRole.QUESTION.ordinal() and (pos := questionName.rfind('_v')) > 0:
+        # cut values added to template name
+        qt_name = questionName[:pos]
+    else:
+        qt_name = questionName
+
     m = Graph();
     for role in questionStages():
-        gm = getQuestionSubgraph(questionName, role, fileService=fileService);
+        if role.ordinal() >= GraphRole.QUESTION.ordinal():
+            graph_name = questionName
+        else:
+            graph_name = qt_name
+        gm = getQuestionSubgraph(graph_name, role, fileService=fileService);
         if gm:
             m += gm;
         if (role == topRole): break;
@@ -494,7 +533,7 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
     global qG
     if qG is None:
         # fetch it once as template data is needed only
-        qG = fetchGraph(NS_questions.base());  # questions Graph containing questions metadata
+        qG = fetchGraph(qG_URI);  # questions Graph containing questions metadata
     if qG is None:
         return None
 
@@ -507,7 +546,7 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
 
     nodeClass = rdflib.term.URIRef(NS_classQuestionTemplate.base())
 
-    ngNode = rdflib.term.URIRef(NS_questions.base());
+    ngNode = rdflib.term.URIRef(qG_URI);
 
     # create an uri in QuestionTemplate# namespace !
     qNode = rdflib.term.URIRef(NS_classQuestionTemplate.get(questionTemplateName));
@@ -582,7 +621,7 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
     global qG
     if qG is None:
         # fetch it once as template data is needed only
-        qG = fetchGraph(NS_questions.base());  # questions Graph containing questions metadata
+        qG = fetchGraph(qG_URI);  # questions Graph containing questions metadata
     if qG is None:
         return None
 
@@ -594,7 +633,7 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
 
     assert qtemplNode, '     (No template found for name: "%s")' % questionTemplateName
 
-    ngNode = rdflib.term.URIRef(NS_questions.base());
+    ngNode = rdflib.term.URIRef(qG_URI);
 
     # create an uri in Question# namespace !
     qNode = rdflib.term.URIRef(NS_classQuestion.get(questionName));
@@ -918,6 +957,7 @@ def generate_questions_for_templates(offset=None, limit=None):
 
 
 def process_question(qname):
+    ''' generating data for question '''
     g = getQuestionModel(qname, GraphRole.QUESTION)
     # gl = graph_lookup(g, PREFIXES)
 
@@ -925,17 +965,28 @@ def process_question(qname):
 
     alg_json = convert_graph_to_json(g)
 
-    q_dict = make_question_dict_for_alg_json(alg_json, qname)
+    try:
+	    q_dict = make_question_dict_for_alg_json(alg_json, qname)
 
-    fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
+	    fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
 
-    print('    Uploading json file ...')
-    fileService.sendFile(fullname,
-        json.dumps(q_dict, ensure_ascii=False).encode()
-        # json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
-    )
+	    print('    Uploading json file ...')
+	    fileService.sendFile(fullname,
+	        # json.dumps(q_dict, ensure_ascii=False).encode()
+	        json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
+	    )
 
-    setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
+	    ### dump alg_json to debug
+	    # fileService.sendFile(fullname[:-4] + 'src.json',
+	    #     # json.dumps(q_dict, ensure_ascii=False).encode()
+	    #     json.dumps(alg_json, ensure_ascii=False, indent=2).encode()
+	    # )
+
+	    setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
+    except Exception as e:
+    	print("exception in process_question:")
+    	print(e)
+    	print()
 
 
 def generate_data_for_questions(offset=None, limit=None):
@@ -1180,7 +1231,7 @@ def just_rdfdb_monitoring():
         sleep(5)
 
 
-def _insert_triples(triples, ng_uri=rdflib.term.URIRef(NS_questions.base()).n3()):
+def _insert_triples(triples, ng_uri=rdflib.term.URIRef(qG_URI).n3()):
     sparql_text = makeInsertTriplesQuery(ng_uri, triples)
     sparql_endpoint.update(sparql_text)
 
@@ -1191,7 +1242,7 @@ def measure_disk_usage_uploading_questions(rdf_src_filepath='c:/Temp2/compp/cont
     print(len(g), 'triples in src graph.')
 
     batch_size = 400
-    _upload_graph(g, rdflib.term.URIRef(NS_questions.base()).n3(), batch_size)
+    _upload_graph(g, rdflib.term.URIRef(qG_URI).n3(), batch_size)
     print('triples insertion completed.')
 
 
@@ -1251,7 +1302,7 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
         g = fileService.fetchModel(path)
         # ###
         # # set constant NG (for Parliament)
-        # qgUri = str(rdflib.term.URIRef(NS_questions.base()))
+        # qgUri = str(rdflib.term.URIRef(qG_URI))
         # ###
         _upload_graph(g, ng_uri=URI(qgUri), batch_size=0)
         print('graph #%d uploaded:' % (i + 1), path)
