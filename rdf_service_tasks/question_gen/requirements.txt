@@ -6,3 +6,6 @@ rdflib
 PyYAML
 # SPARQL-Burger < -- use patched local version
 # networkx < -- no longer used
+
+# database ORM for sqlite, mysql, postgresql
+peewee
