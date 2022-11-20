@@ -376,7 +376,7 @@ def questionStages():
 def findQuestionByName(questionName, questions_graph=qG):
         qG = questions_graph or fetchGraph(qG_URI);
         if qG:
-            qNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionName))
+            qNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionName))
             if qNode:
                 return qNode
 
@@ -394,7 +394,7 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_
             if qNode:
                 targetGraphUri = qG.value(
                     qNode,
-                    rdflib.term.URIRef(questionSubgraphPropertyFor(role)),
+                    rdflib.URIRef(questionSubgraphPropertyFor(role)),
                     None)
                 if targetGraphUri == RDF.nil:
                     targetGraphUri = None
@@ -423,10 +423,10 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
     qgNode = NS_file.get(qgUri);
 
     upd_setGraph = makeUpdateTripleQuery(
-            rdflib.term.URIRef(qG_URI).n3(),
+            rdflib.URIRef(qG_URI).n3(),
             questionNode.n3(),
-            rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
-            rdflib.term.URIRef(qgNode).n3()
+            rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
+            rdflib.URIRef(qgNode).n3()
     );
 
     ### print(upd_setGraph)
@@ -436,17 +436,17 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
 
     if model:
 	    # copy has_concept relations to metadata graph (into questions/ NS) ...
-	    has_concept = rdflib.term.URIRef(NS_code.get("has_concept"))
+	    has_concept = rdflib.URIRef(NS_code.get("has_concept"))
 
 	    # None ??? >>
 	    concepts = extract_graph_values(model, subject=None, predicate=has_concept)
-	    has_concept_qs = rdflib.term.URIRef(NS_questions.get("has_concept")).n3()
+	    has_concept_qs = rdflib.URIRef(NS_questions.get("has_concept")).n3()
 	    insert_concepts_query = makeInsertTriplesQuery(
-	        named_graph=rdflib.term.URIRef(qG_URI).n3(),
+	        named_graph=rdflib.URIRef(qG_URI).n3(),
 	        triples=[
 	                (questionNode.n3(),
 	                 has_concept_qs,
-	                 rdflib.term.Literal(concept_str).n3())
+	                 rdflib.Literal(concept_str).n3())
 	                for concept_str in concepts
 	            ]
 	    )
@@ -454,7 +454,7 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
 	    print('      SPARQL: insert concepts query response-code:', res.response.code)
 
 
-def extract_graph_values(model: Graph, subject: rdflib.term.URIRef=None, predicate: rdflib.term.URIRef=None):
+def extract_graph_values(model: Graph, subject: rdflib.URIRef=None, predicate: rdflib.URIRef=None):
     objs = model.objects(subject, predicate)
     return [o.toPython() for o in objs]
 
@@ -522,7 +522,7 @@ def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*10
             print("    Upload model ...");
             with src_fs.open(path) as f:
                 m = _patch_and_parse_ttl(f)
-            setQuestionSubgraph(name, GraphRole.QUESTION_TEMPLATE, m, questionNode=rdflib.term.URIRef(qUri))
+            setQuestionSubgraph(name, GraphRole.QUESTION_TEMPLATE, m, questionNode=rdflib.URIRef(qUri))
 
     print("Uploading templates completed.")
     print("Used", files_selected, 'files of', files_total, 'in the directory.')
@@ -537,19 +537,19 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
     if qG is None:
         return None
 
-    templNodeExists = (None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionTemplateName)) in qG;
+    templNodeExists = (None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionTemplateName)) in qG;
 
     if templNodeExists:
-        qtemplNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionTemplateName));
+        qtemplNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionTemplateName));
         return qtemplNode
 
 
-    nodeClass = rdflib.term.URIRef(NS_classQuestionTemplate.base())
+    nodeClass = rdflib.URIRef(NS_classQuestionTemplate.base())
 
-    ngNode = rdflib.term.URIRef(qG_URI);
+    ngNode = rdflib.URIRef(qG_URI);
 
     # create an uri in QuestionTemplate# namespace !
-    qNode = rdflib.term.URIRef(NS_classQuestionTemplate.get(questionTemplateName));
+    qNode = rdflib.URIRef(NS_classQuestionTemplate.get(questionTemplateName));
 
     commands = [];
 
@@ -561,8 +561,8 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
             qNode.n3(),
-            rdflib.term.URIRef(NS_questions.get("name")).n3(),
-            rdflib.term.Literal(questionTemplateName).n3()));
+            rdflib.URIRef(NS_questions.get("name")).n3(),
+            rdflib.Literal(questionTemplateName).n3()));
 
     # initialize template's graphs as empty ...
     # using "template-only" roles
@@ -570,7 +570,7 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
         obj = RDF.nil
         commands.append(makeUpdateTripleQuery(ngNode.n3(),
                 qNode.n3(),
-                rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
+                rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
                 obj.n3()));
 
     full_query = '\n;\n'.join(commands)
@@ -625,18 +625,18 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
     if qG is None:
         return None
 
-    nodeClass = rdflib.term.URIRef(NS_classQuestion.base());
+    nodeClass = rdflib.URIRef(NS_classQuestion.base());
 
     # (skip checking for duplicates)
 
-    qtemplNode = qG.value(None, rdflib.term.URIRef(NS_questions.get("name")), rdflib.term.Literal(questionTemplateName));
+    qtemplNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionTemplateName));
 
     assert qtemplNode, '     (No template found for name: "%s")' % questionTemplateName
 
-    ngNode = rdflib.term.URIRef(qG_URI);
+    ngNode = rdflib.URIRef(qG_URI);
 
     # create an uri in Question# namespace !
-    qNode = rdflib.term.URIRef(NS_classQuestion.get(questionName));
+    qNode = rdflib.URIRef(NS_classQuestion.get(questionName));
 
     commands = [];
 
@@ -644,18 +644,18 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
             qNode.n3(),
-            rdflib.term.URIRef(NS_questions.get("name")).n3(),
-            rdflib.term.Literal(questionName).n3()));
+            rdflib.URIRef(NS_questions.get("name")).n3(),
+            rdflib.Literal(questionName).n3()));
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
             qNode.n3(),
-            rdflib.term.URIRef(NS_questions.get("has_template")).n3(),
+            rdflib.URIRef(NS_questions.get("has_template")).n3(),
             qtemplNode.n3()));
 
     # copy references to the graphs from template as is ...
     # using "template-only" roles
     for role in (GraphRole.QUESTION_TEMPLATE, GraphRole.QUESTION_TEMPLATE_SOLVED):
-        propOfRole = rdflib.term.URIRef(questionSubgraphPropertyFor(role));
+        propOfRole = rdflib.URIRef(questionSubgraphPropertyFor(role));
         graphWithRole = qG.value(qtemplNode, propOfRole, None);
         commands.append(makeUpdateTripleQuery(ngNode.n3(), qNode.n3(), propOfRole.n3(), graphWithRole.n3()));
 
@@ -668,10 +668,10 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
         ):
         obj = RDF.nil
         if role == GraphRole.QUESTION and questionDataGraphUri:
-            obj = rdflib.term.URIRef(questionDataGraphUri)
+            obj = rdflib.URIRef(questionDataGraphUri)
         commands.append(makeUpdateTripleQuery(ngNode.n3(),
                 qNode.n3(),
-                rdflib.term.URIRef(questionSubgraphPropertyFor(role)).n3(),
+                rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
                 obj.n3()));
 
 
@@ -681,7 +681,7 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
         if not isinstance(vals, (list, tuple)):
             vals = [vals]
         for v in vals:
-            triples.append(( qNode.n3(), URI(NS_questions.get(name)), rdflib.term.Literal(v).n3() ))
+            triples.append(( qNode.n3(), URI(NS_questions.get(name)), rdflib.Literal(v).n3() ))
 
     if triples:
         commands.append(makeInsertTriplesQuery(ngNode.n3(), triples, )) ## PREFIXES
@@ -1231,7 +1231,7 @@ def just_rdfdb_monitoring():
         sleep(5)
 
 
-def _insert_triples(triples, ng_uri=rdflib.term.URIRef(qG_URI).n3()):
+def _insert_triples(triples, ng_uri=rdflib.URIRef(qG_URI).n3()):
     sparql_text = makeInsertTriplesQuery(ng_uri, triples)
     sparql_endpoint.update(sparql_text)
 
@@ -1242,7 +1242,7 @@ def measure_disk_usage_uploading_questions(rdf_src_filepath='c:/Temp2/compp/cont
     print(len(g), 'triples in src graph.')
 
     batch_size = 400
-    _upload_graph(g, rdflib.term.URIRef(qG_URI).n3(), batch_size)
+    _upload_graph(g, rdflib.URIRef(qG_URI).n3(), batch_size)
     print('triples insertion completed.')
 
 
@@ -1273,7 +1273,7 @@ def _upload_graph(g, ng_uri, batch_size=-1, verbose=True):
 
 def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEMPLATE, skip=0):
     'Note: set PREFETCH_QUESTIONS = True'
-    target_role_uriref = rdflib.term.URIRef(questionSubgraphPropertyFor(target_role))
+    target_role_uriref = rdflib.URIRef(questionSubgraphPropertyFor(target_role))
 
     target_model_paths = []
 
@@ -1302,7 +1302,7 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
         g = fileService.fetchModel(path)
         # ###
         # # set constant NG (for Parliament)
-        # qgUri = str(rdflib.term.URIRef(qG_URI))
+        # qgUri = str(rdflib.URIRef(qG_URI))
         # ###
         _upload_graph(g, ng_uri=URI(qgUri), batch_size=0)
         print('graph #%d uploaded:' % (i + 1), path)

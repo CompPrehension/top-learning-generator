@@ -126,7 +126,7 @@ def expand_prefix(name, prefix2ns={}):
         pfx, localname = name.partition(':')[0:3:2]  # get [0] & [2]
         ns = prefix2ns.get(pfx, None) or prefix2ns.get(pfx + ':', None)
         if ns:
-            return rdflib.term.URIRef(ns + localname)
+            return rdflib.URIRef(ns + localname)
 
 class graph_lookup:
     def __init__(self, g, prefixes={}):
@@ -137,9 +137,9 @@ class graph_lookup:
         self.resources = list(sorted({*self.g.subjects(), *self.g.objects()}))
         self.properties = list(sorted({*self.g.predicates()}))
 #     def resourse(self, name):
-#         return rdflib.term.URIRef(match_name(name, self.resources, self.prefixes))
+#         return rdflib.URIRef(match_name(name, self.resources, self.prefixes))
 #     def property(self, name):
-#         return rdflib.term.URIRef(match_name(name, self.properties, self.prefixes))
+#         return rdflib.URIRef(match_name(name, self.properties, self.prefixes))
     @functools.lru_cache(maxsize=None)
     def __call__(self, name):
         return (match_name(name, self.properties + self.resources, self.prefixes))
@@ -212,22 +212,22 @@ if __name__ == '__main__':
     gl = graph_lookup(some_rdflib_Graph, PREFIXES)
 
     gl("rdf:type")
-    # rdflib.term.URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
+    # rdflib.URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
 
     gl(':reason_kind')
-    # rdflib.term.URIRef('http://vstu.ru/poas/code#reason_kind')
+    # rdflib.URIRef('http://vstu.ru/poas/code#reason_kind')
 
     gl('21')
-    # rdflib.term.Literal('21', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#integer'))
+    # rdflib.Literal('21', datatype=rdflib.URIRef('http://www.w3.org/2001/XMLSchema#integer'))
 
     gl('ub8bL900C17')
-    # rdflib.term.BNode('ub8bL900C17')
+    # rdflib.BNode('ub8bL900C17')
     # ^ this Bnode is specific for my graph
 
     [*qt0.subjects(RDF.type, gl(':expr'))]
-    # [rdflib.term.URIRef('http://vstu.ru/poas/code#expr__10'),
-    #  rdflib.term.URIRef('http://vstu.ru/poas/code#expr__19'),
-    #  rdflib.term.URIRef('http://vstu.ru/poas/code#expr__4')]
+    # [rdflib.URIRef('http://vstu.ru/poas/code#expr__10'),
+    #  rdflib.URIRef('http://vstu.ru/poas/code#expr__19'),
+    #  rdflib.URIRef('http://vstu.ru/poas/code#expr__4')]
 
 
     # str -> URI/BNode -> str

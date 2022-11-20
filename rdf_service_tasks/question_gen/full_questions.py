@@ -141,7 +141,7 @@ def convert_graph_to_json(g):
         # write back to graph (for rendering code later)
         g.set((parent,
                gl(':cond_values_hint'),
-               rdflib.term.Literal(make_values_hint(values, is_loop, is_postcond))))
+               rdflib.Literal(make_values_hint(values, is_loop, is_postcond))))
 
         # save expr values
         stmt_name = g.value(expr, gl(':stmt_name'), None)

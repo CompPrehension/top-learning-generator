@@ -46,7 +46,7 @@ class GView:
 		# [':entry_point', ':stmt_name', ':global_code', ':id', ':algorithm_name', 'rdf:type']
 
 		w.value('rdf:type')
-		# rdflib.term.URIRef('http://vstu.ru/poas/code#algorithm')
+		# rdflib.URIRef('http://vstu.ru/poas/code#algorithm')
 
 		[*w.items()]
 		# [(':entry_point', [GView(<graph>, ':sequence__44')]),
@@ -55,18 +55,18 @@ class GView:
 		#  (':id', [45]),
 		#  (':algorithm_name', ['1__memcpy_s__1639429224']),
 		#  ('rdf:type',
-		#   [rdflib.term.URIRef('http://vstu.ru/poas/code#algorithm'),
-		#    rdflib.term.URIRef('http://www.w3.org/2002/07/owl#NamedIndividual')])]
+		#   [rdflib.URIRef('http://vstu.ru/poas/code#algorithm'),
+		#    rdflib.URIRef('http://www.w3.org/2002/07/owl#NamedIndividual')])]
 
 		w.get('global_code', str)  # non-collection type as default (it could have been `int` or even `None`)
 		# GView(<graph>, ':sequence__44')   # sub-View returned
 
 		[*w.values()]
 		# ['1__memcpy_s__1639429224',
-		#  rdflib.term.URIRef('http://vstu.ru/poas/code#algorithm'),
+		#  rdflib.URIRef('http://vstu.ru/poas/code#algorithm'),
 		#  45,
 		#  'algorithm__45',
-		#  rdflib.term.URIRef('http://www.w3.org/2002/07/owl#NamedIndividual'),
+		#  rdflib.URIRef('http://www.w3.org/2002/07/owl#NamedIndividual'),
 		#  GView(<graph>, ':sequence__44')]
 
 		str(w)
@@ -77,7 +77,7 @@ class GView:
 
 		GView(g, 'http://vstu.ru/poas/code#stmt_name')  # causes AssertionError as `stmt_name` is a property, not a subject.
 		# AssertionError  <...>
-		# AssertionError: subject must be in graph `g`, but it is not: rdflib.term.URIRef('http://vstu.ru/poas/code#stmt_name')
+		# AssertionError: subject must be in graph `g`, but it is not: rdflib.URIRef('http://vstu.ru/poas/code#stmt_name')
 	'''
 	def __init__(self, g: Graph, subject: URIRef, gl: graph_lookup=None):
 		assert g

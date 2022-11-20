@@ -70,3 +70,4 @@ class GraphRole(JavaEnum):
 
 if __name__ == '__main__':
     print(GraphRole.SCHEMA)
+    print(NamespaceUtil.make_base(GraphRole.QUESTION_DATA.prefix) + "_graph")

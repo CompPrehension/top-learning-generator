@@ -307,7 +307,7 @@ def nontrivial_ways(ways: list, max_similar=2, length_ratio=0.34, print_report=T
     return selected_trace_configs
 
 
-def _make_updates_for_FOR_loop(st: rdflib.term.URIRef, lower_bound: int, upper_bound: int, g, gl) -> dict:
+def _make_updates_for_FOR_loop(st: rdflib.URIRef, lower_bound: int, upper_bound: int, g, gl) -> dict:
     # describe what to replace in Graph's triples to obtain specified bounds:
     # update loop header by inserting appropriate values into init and cond clauses
     # updates to Way properties
@@ -323,8 +323,8 @@ def _make_updates_for_FOR_loop(st: rdflib.term.URIRef, lower_bound: int, upper_b
     assert init
     lvalue = init.partition('=')[0]
     new_init = '%s = %d' % (lvalue.strip(), lower_bound)
-    tor = TripleOverrider((init_node, gl(':stmt_name'), rdflib.term.Literal(init)),
-                          o=rdflib.term.Literal(new_init))
+    tor = TripleOverrider((init_node, gl(':stmt_name'), rdflib.Literal(init)),
+                          o=rdflib.Literal(new_init))
     node_id = g.value(init_node, gl(':id'), None).toPython()
     updates[node_id] = tor
 
@@ -339,8 +339,8 @@ def _make_updates_for_FOR_loop(st: rdflib.term.URIRef, lower_bound: int, upper_b
     op = '<=' if '<=' in cond else '<'  # !!! only two cmp operations supported so far!
     lvalue = cond.partition(op)[0]
     new_cond = '%s %s %d' % (lvalue.strip(), op, upper_bound)
-    tor = TripleOverrider((cond_node, gl(':stmt_name'), rdflib.term.Literal(cond)),
-                          o=rdflib.term.Literal(new_cond))
+    tor = TripleOverrider((cond_node, gl(':stmt_name'), rdflib.Literal(cond)),
+                          o=rdflib.Literal(new_cond))
     node_id = g.value(cond_node, gl(':id'), None).toPython()
     updates[node_id] = tor
 
@@ -348,7 +348,7 @@ def _make_updates_for_FOR_loop(st: rdflib.term.URIRef, lower_bound: int, upper_b
 
 
 @lru_cache()
-def ways_through(st: rdflib.term.URIRef, g: Graph, gl=None):
+def ways_through(st: rdflib.URIRef, g: Graph, gl=None):
     """ -> [way1, way2, ...]
     """
     check_interrupt()
@@ -555,7 +555,7 @@ def makeQuestionGraph(way: Way, g, gl):
         if prev_act:
             qg.add((prev_act, gl(':next_act'), act))
         # index
-        qg.add((act, gl(':index'), rdflib.term.Literal(act_index)))
+        qg.add((act, gl(':index'), rdflib.Literal(act_index)))
 
         st = g.value(bound, gl(':end_of'), None)
         if st and (st, RDF.type, gl(':expr')) in g:
@@ -567,7 +567,7 @@ def makeQuestionGraph(way: Way, g, gl):
             assert cond_value is not None, cond_name
 
             # expr_value
-            qg.add((act, gl(':expr_value'), rdflib.term.Literal(cond_value)))
+            qg.add((act, gl(':expr_value'), rdflib.Literal(cond_value)))
 
         prev_act = act
         prev_phase = phase_mark
