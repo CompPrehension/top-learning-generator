@@ -8,7 +8,7 @@ import sys
 
 from service import *
 
-from rdf2alg_json import graph_2_json
+from rdf2alg_json import graph_2_json, fix_algorithm_graph
 from rdflib_utils import TripleOverrider
 
 
@@ -106,6 +106,13 @@ def patch_graph(g):
         tor = TripleOverrider.create_from_graph(tor_node, g)
         tor.apply_on_graph(g, remove_self=True)
         print('\t [INFO]  TripleOverrider changes were applied.')
+
+
+def repair_statements_in_graph(g, gl=None):
+    gl = gl or graph_lookup(g, PREFIXES)
+    g = fix_algorithm_graph(g, gl)
+    return g
+
 
 def convert_graph_to_json(g):
     'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, remove acts & boundaries.'

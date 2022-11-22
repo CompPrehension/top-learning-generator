@@ -26,6 +26,7 @@ from RemoteFileService import RemoteFileService
 from sparql_wrapper import Sparql
 from analyze_alg import jsObj
 
+import sqlite_questions_metadata as dbmeta
 sys.path.insert(1, '../../../c_owl/')
 if 0:
     # just for debugger to see the code in different directory
@@ -48,10 +49,10 @@ INIT_GLOBALS = True
 # qG_URI = 'http://vstu.ru/poas/questions'  # required for question generation
 qG_URI = 'http://vstu.ru/poas/selected_questions'
 
-# PREFETCH_QUESTIONS = False
-PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
-# DUMP_QUESTION_GRAPH_TO_FILE = False
-DUMP_QUESTION_GRAPH_TO_FILE = True  # and exit immediately!
+PREFETCH_QUESTIONS = False
+# PREFETCH_QUESTIONS = True  # uri of graph to fetch can be changed below
+DUMP_QUESTION_GRAPH_TO_FILE = False
+# DUMP_QUESTION_GRAPH_TO_FILE = True  # and exit immediately!
 REMOVE_TRIPLES_FOR_PRODUCTION = True  # only when saving graph to file
 
 GATHER_DB_SIZE_INFO = False
@@ -212,6 +213,9 @@ def URI(uri):
 def questionSubgraphPropertyFor(role: GraphRole) -> str:
     return NS_questions.get("has_graph_" + role.ns().base());
 
+def tableFieldForRoleDB(role: GraphRole) -> str:
+    return NamespaceUtil.make_base(role.prefix) + "_graph";
+
 
 def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
     'get names of questions with `rdf:nil` set for specified graph'
@@ -313,12 +317,12 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
     # pre-download whole questions graph
     print('Pre-download whole questions graph ...')
     if False:
-	    pass;  # qUri = qG_URI
+        pass;  # qUri = qG_URI
     else:
-	    ## qUri = 'http://vstu.ru/poas/questions_only'
-	    # qUri = 'http://vstu.ru/poas/selected_questions'
-	    # ! qG_URI !
-	    print('Fetching graph as specified:', qG_URI)
+        ## qUri = 'http://vstu.ru/poas/questions_only'
+        # qUri = 'http://vstu.ru/poas/selected_questions'
+        # ! qG_URI !
+        print('Fetching graph as specified:', qG_URI)
     qG = fetchGraph(qG_URI, verbose=True)
 
     if DUMP_QUESTION_GRAPH_TO_FILE:
@@ -327,22 +331,22 @@ if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
         dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
 
         if REMOVE_TRIPLES_FOR_PRODUCTION:
-        	# just remove unused properties (has_graph_*) from question nodes
-        	# before exporting to production env
-        	nsQ = 'http://vstu.ru/poas/questions/'
-        	prop_names = '''
-        	has_graph_q_s
-        	has_graph_q
-        	has_graph_qt
-        	has_graph_qt_s'''.split()
+            # just remove unused properties (has_graph_*) from question nodes
+            # before exporting to production env
+            nsQ = 'http://vstu.ru/poas/questions/'
+            prop_names = '''
+            has_graph_q_s
+            has_graph_q
+            has_graph_qt
+            has_graph_qt_s'''.split()
 
-        	i = 0
-        	for pn in prop_names:
-        	    p = rdflib.URIRef(pn, nsQ)
-        	    for s, o in qG.subject_objects(p):
-        	        qG.remove((s, p, o))
-        	        i += 1
-        	print("Removed %d triples from graph (for production)." % i)
+            i = 0
+            for pn in prop_names:
+                p = rdflib.URIRef(pn, nsQ)
+                for s, o in qG.subject_objects(p):
+                    qG.remove((s, p, o))
+                    i += 1
+            print("Removed %d triples from graph (for production)." % i)
 
         # shorten length of serialized data
         qG.bind('Q', 'http://vstu.ru/poas/questions/Question#')
@@ -408,6 +412,12 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_
         return fileService.prepareNameForFile(role.ns().get(questionName + file_ext), False);
 
 
+def getSubpathForQuestionGraph(name, role:GraphRole, file_ext=".ttl", fileService=fileService):
+    file_path = GraphRole.QUESTION_TEMPLATE.ns().get(name)
+    if not file_path.endswith(file_ext):
+        file_path += file_ext
+    return fileService.prepareNameForFile(file_path);
+
 
 
 def getQuestionSubgraph(questionName, role, fileService=fileService):
@@ -435,23 +445,48 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
     print('      SPARQL: set question subgraph response-code:', res.response.code)
 
     if model:
-	    # copy has_concept relations to metadata graph (into questions/ NS) ...
-	    has_concept = rdflib.URIRef(NS_code.get("has_concept"))
+        # copy has_concept relations to metadata graph (into questions/ NS) ...
+        has_concept = rdflib.URIRef(NS_code.get("has_concept"))
 
-	    # None ??? >>
-	    concepts = extract_graph_values(model, subject=None, predicate=has_concept)
-	    has_concept_qs = rdflib.URIRef(NS_questions.get("has_concept")).n3()
-	    insert_concepts_query = makeInsertTriplesQuery(
-	        named_graph=rdflib.URIRef(qG_URI).n3(),
-	        triples=[
-	                (questionNode.n3(),
-	                 has_concept_qs,
-	                 rdflib.Literal(concept_str).n3())
-	                for concept_str in concepts
-	            ]
-	    )
-	    res = sparql_endpoint.update(insert_concepts_query)
-	    print('      SPARQL: insert concepts query response-code:', res.response.code)
+        # None ??? >>
+        concepts = extract_graph_values(model, subject=None, predicate=has_concept)
+        has_concept_qs = rdflib.URIRef(NS_questions.get("has_concept")).n3()
+        insert_concepts_query = makeInsertTriplesQuery(
+            named_graph=rdflib.URIRef(qG_URI).n3(),
+            triples=[
+                    (questionNode.n3(),
+                     has_concept_qs,
+                     rdflib.Literal(concept_str).n3())
+                    for concept_str in concepts
+                ]
+        )
+        res = sparql_endpoint.update(insert_concepts_query)
+        print('      SPARQL: insert concepts query response-code:', res.response.code)
+
+
+def setQuestionSubgraphDB(row_instance, role, model: Graph, subgraph_path=None, fileService=fileService):
+    # qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
+    file_subpath = subgraph_path or getSubpathForQuestionGraph(row_instance.name, role)
+    db_field_name = tableFieldForRoleDB(role)
+
+    if model:
+        fileService.sendModel(file_subpath, model);
+
+    # update question's metadata
+    setattr(row_instance, db_field_name, file_subpath)
+
+    if model:
+        # copy has_concept relations to metadata graph (into questions/ NS) ...
+        has_concept = rdflib.URIRef(NS_code.get("has_concept"))
+
+        concepts = extract_graph_values(model, subject=None, predicate=has_concept)
+
+        dbmeta.update_bit_field(row_instance, 'concept_bits', dbmeta.names_to_bitmask(concepts, entity=dbmeta.Concepts))
+
+
+    row_instance._stage = dbmeta.STAGE_QT_CREATED
+    row_instance._version = dbmeta.TOOL_VERSION
+    row_instance.save()
 
 
 def extract_graph_values(model: Graph, subject: rdflib.URIRef=None, predicate: rdflib.URIRef=None):
@@ -492,8 +527,46 @@ def _patch_and_parse_ttl(opened_file):
     return g
 
 
-def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024), skip_first=0):
-    ''' ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
+def load_templates(limit=None) -> int:
+    ''' rdf metadata: ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
+    '''
+
+    # templates_total = 0
+    done_count = 0
+
+    qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
+    if not qt_list:
+        return 0
+
+    from full_questions import repair_statements_in_graph
+
+    ch = Checkpointer()
+
+    for qt in qt_list:
+
+        path = CONFIG.src_ttl_dir + (qt.src_path)
+        with open(path) as f:
+            m = _patch_and_parse_ttl(f)
+
+        try:
+            m = repair_statements_in_graph(m)
+        except AssertionError:
+            print(f'error with "{qt.name}"')
+            # raise
+
+        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, m)
+        done_count += 1
+        if done_count % 20 == 0:
+	        ch.hit(        '   + 20 templates created')
+	        ch.since_start('[%3d] time elapsed so far:' % done_count)
+
+    ch.since_start("Loading templates completed, in")
+    print("Loaded", done_count, 'templates of', len(qt_list), 'currently selected.')
+    return len(qt_list)
+
+
+def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024), skip_first=0):
+    ''' Find files and add info about them to DB
     '''
 
     files_total = 0
@@ -507,7 +580,7 @@ def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*10
             files_total += 1
 
             if skip_first > 0 and files_total < skip_first:
-            	continue
+                continue
 
             if file_size_filter and not(file_size_filter[0] <= info.size <= file_size_filter[1]):
                 continue
@@ -517,14 +590,10 @@ def upload_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*10
             name = "_".join(info.name.split("__")[:-1])[:-12]
             print('[%3d]' % files_selected, name, '...')
 
-            qUri = createQuestionTemplate(name);
+            # qUri = createQuestionTemplate(name);
+            qt = dbmeta.createQuestionTemplateDB(name, src_file_path=path);
 
-            print("    Upload model ...");
-            with src_fs.open(path) as f:
-                m = _patch_and_parse_ttl(f)
-            setQuestionSubgraph(name, GraphRole.QUESTION_TEMPLATE, m, questionNode=rdflib.URIRef(qUri))
-
-    print("Uploading templates completed.")
+    print("Searching for templates completed.")
     print("Used", files_selected, 'files of', files_total, 'in the directory.')
 
 
@@ -939,8 +1008,8 @@ def generate_questions_for_templates(offset=None, limit=None):
         print("    (skipped so far: %d)" % skip_count)
         print("========")
         if qtname in ('curl_mvsnprintf', ):
-        	print('intended skip.')
-        	continue
+            print('intended skip.')
+            continue
         try:
             questions_count += process_template(qtname, questions_count)
         except NotImplementedError as e:
@@ -966,27 +1035,27 @@ def process_question(qname):
     alg_json = convert_graph_to_json(g)
 
     try:
-	    q_dict = make_question_dict_for_alg_json(alg_json, qname)
+        q_dict = make_question_dict_for_alg_json(alg_json, qname)
 
-	    fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
+        fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
 
-	    print('    Uploading json file ...')
-	    fileService.sendFile(fullname,
-	        # json.dumps(q_dict, ensure_ascii=False).encode()
-	        json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
-	    )
+        print('    Uploading json file ...')
+        fileService.sendFile(fullname,
+            # json.dumps(q_dict, ensure_ascii=False).encode()
+            json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
+        )
 
-	    ### dump alg_json to debug
-	    # fileService.sendFile(fullname[:-4] + 'src.json',
-	    #     # json.dumps(q_dict, ensure_ascii=False).encode()
-	    #     json.dumps(alg_json, ensure_ascii=False, indent=2).encode()
-	    # )
+        ### dump alg_json to debug
+        # fileService.sendFile(fullname[:-4] + 'src.json',
+        #     # json.dumps(q_dict, ensure_ascii=False).encode()
+        #     json.dumps(alg_json, ensure_ascii=False, indent=2).encode()
+        # )
 
-	    setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
+        setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
     except Exception as e:
-    	print("exception in process_question:")
-    	print(e)
-    	print()
+        print("exception in process_question:")
+        print(e)
+        print()
 
 
 def generate_data_for_questions(offset=None, limit=None):
@@ -1308,15 +1377,37 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
         print('graph #%d uploaded:' % (i + 1), path)
 
 
+def automatic_pipeline(batch=300):
+    if load_templates(limit=None) > 0:
+        return
+
+    # if solve_templates(limit=batch) > 0:
+    #   return
+
+
+    print('everything is done!')
+    print('Just waiting...')
+    from time import sleep
+    sleep(30*60)
+    exit()
+
+
 if __name__ == '__main__':
     print('Initializing...')
     # upload_templates(r'c:/Temp2/cf_v8-pre')
     # upload_templates(r'c:/Temp2/cf_v8')
     # upload_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=5200)
 
+    # find_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=0)
+    # find_templates(CONFIG.src_ttl_dir, skip_first=0)
+
+    automatic_pipeline()
+
+
     # make_questions__main()
 
-    generate_data_for_questions(0, None)
+    # generate_data_for_questions(0, None)
+
 
     # add_concepts_from_list()
     # make_questions_sample(size=200)

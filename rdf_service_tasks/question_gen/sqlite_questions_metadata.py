@@ -1,18 +1,152 @@
 # sqlite_questions_metadata.py
 
+# note that path to sqlite file is hardcoded by classes generator
 from db_utils.sqlite_orm_classes import *
 
 
 # write to `_version` column to track data generated with older scripts
-PROCESSING_TOOLS_VERSION = 1
+TOOL_VERSION = 1
+
+# some enum-like constants
+STAGE_QT_FOUND = 0
+STAGE_QT_CREATED = 1
+STAGE_QT_SOLVED = 2
+STAGE_QT_USED = 2
+
+STAGE_Q_CREATED = 1
+STAGE_Q_SOLVED = 2
+STAGE_Q_DATA_SAVED = 3
 
 
 
-def get_or_create(key_fields: dict, set_fields: dict=None, entity=Concepts):
+def findQuestionOrTemplateByNameDB(name):
+    obj = (Questions.get(Questions.name == names)
+        or Templates.get(Templates.name == names));
+    if not obj:
+        print("    (DB: No question or template found for name: %s)" % name)
+    return obj
+
+
+def findQuestionsOnStageDB(stage=1, limit=None):
+    iterator = Questions.select().where(Questions._stage == stage).limit(limit).execute()
+    return list(iterator)
+
+def findTemplatesOnStageDB(stage=1, limit=None):
+    iterator = Templates.select().where(Templates._stage == stage).limit(limit).execute()
+    return list(iterator)
+
+
+
+def createQuestionTemplateDB(questionTemplateName, src_file_path=None) -> 'question template instance':
+
+    qt = Templates.get_or_none(Templates.name == questionTemplateName)
+
+    if not qt:
+        # qt = create_or_update(
+        #   key_fields={'name': questionTemplateName,
+        #               'src_path': src_file_path, '_stage': STAGE_QT_FOUND
+        #               },
+        #   # set_fields={},
+        #   entity=Templates
+        # )
+        qt = Templates.create(**{
+            'name': questionTemplateName,
+            'src_path': src_file_path,
+            '_stage': STAGE_QT_FOUND,
+            '_version': TOOL_VERSION,
+        })
+        print('      DB: created template (id=%d):' % qt.id, qt.name)
+    else:
+        print()
+        print('    ! DB: DUPLICATE of template (id=%d):' % qt.id, qt.name)
+        print()
+
+    return qt
+
+
+# /**
+#  * Create metadata representing empty Question, OVERWRITE any existing data.
+#  * @param questionName unique Uri-conformant name of question
+#  * @return true on success
+#  */
+def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'question URI':
+    q = Questions.get_or_none(Questions.name == questionName)
+
+    if not q:
+        q = Questions.create(**{
+            'name': questionName,
+            'template': template,
+            'q_graph': q_graph,
+            '_stage': STAGE_Q_CREATED,
+            '_version': TOOL_VERSION,
+        })
+        print('      DB: created question (id=%d):' % q.id, q.name)
+    else:
+        print()
+        print('    ! DB: DUPLICATE of question (id=%d):' % q.id, q.name)
+        print()
+
+    # > add other metadata
+
+    # get template instance (directly, thanks to ORM)
+    # to write to it if no appropriate field found in `q`
+    qt = q.template
+
+    fields_of_collections = {
+        'has_tag':      (Tag,             'tag_bits'),
+        'has_concept':  (Concept,     'concept_bits'),
+        'has_law':      (Law,             'law_bits'),
+        'has_violation':(Violation, 'violation_bits'),
+    }
+
+    need_save_qt = False
+
+    for name, vals in metrics.items():
+        if isinstance(vals, (list, tuple)):
+            if (entity_field := fields_of_collections.get(name)):
+                entity, name = entity_field  # note: rewrite `name`
+                vals = names_to_bitmask(vals, entity)  # rewrite `vals`
+            else:
+                raise ValueError(('Bad combination of question data:', (name, vals)))
+        if hasattr(q, name):
+            if hasattr(qt, name) and name.endswith('_bits'):
+                # copy concept bits from template
+                vals |= getattr(qt, name) or 0
+            setattr(q, name, vals)
+        elif hasattr(qt, name):
+            setattr(qt, name, vals)
+            need_save_qt = True
+        else:
+            raise ValueError(('Bad combination of question/template data:', (name, vals)))
+
+    q.save()
+    if need_save_qt:
+        qt.save()
+    # < add other metadata
+
+    print('      DB: updated q & qt metadata.')
+
+    return q
+
+
+def update_bit_field(row_instance, field_name: str, new_bits: int, replace_mode=False):
+    ''' add/set bits to instance; do not save it. '''
+    if not replace_mode:
+        prev_value = getattr(row_instance, field_name) # or 0
+        if prev_value:
+            new_bits |= prev_value
+
+    setattr(row_instance, field_name, new_bits)
+
+
+
+
+def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, update_always=False):
+    ''' search record by `key_fields` and update it with `set_fields` '''
     record, created = entity.get_or_create(**key_fields)
     need_save = False
-#     if created:
-    if set_fields:
+    # if created:
+    if set_fields and (created or update_always):
         for k, v in set_fields.items():
             if v != getattr(record, k):
                 print('updating %s.%s =>' % (entity.__name__, k), v)
@@ -27,15 +161,15 @@ def get_or_create(key_fields: dict, set_fields: dict=None, entity=Concepts):
         record.save()  # send updates to DB
     return record
 
-	# Tags.get_or_none(Tags.name == 'ordering')
-	# t = get_or_create(dict(name='supplementary'), Tags)
-	# t = get_or_create(dict(name='loops'), dict(display_name='Циклы'), Concepts)
+    # Tags.get_or_none(Tags.name == 'ordering')
+    # t = create_or_update(dict(name='supplementary'), Tags)
+    # t = create_or_update(dict(name='loops'), dict(display_name='Циклы'), Concepts)
 
 
 def names_to_bitmask(names: list[str], entity=Concepts):
     '''gaters bits from records (creating new rows when not exist)'''
     bitmask = 0
-    for obj in (get_or_create({'name': name}, entity=entity) for name in names):
+    for obj in (create_or_update({'name': name}, entity=entity) for name in names):
         try:
             bit = obj.bit
         except AttributeError:

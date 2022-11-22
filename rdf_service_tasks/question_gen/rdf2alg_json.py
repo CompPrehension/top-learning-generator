@@ -236,6 +236,26 @@ class AlgorithmGraphWalker(GView):
 		return d
 
 
+def remove_node_from_sequence(node:GView, gl):
+	# reassign `:next` links & `item_index` numbers
+	body_node = node.value(~gl(':body_item'))  # == subj
+	prev_node = node.value(~gl(':next'))
+	next_node = node.value(gl(':next'))
+	node.remove(':next', next_node)
+	body_node.remove(':body_item', node)
+	node.remove(None, None)  # del this node completely
+	if next_node:
+		prev_node.setvalue(':next', next_node)
+		# renumber the rest of nodes
+		i = node.item_index
+		while i is not None and next_node:
+			next_node.setvalue(':next_node', i)
+			next_node = next_node.value(':next')
+			i += 1
+	else:
+		prev_node.remove(gl(':next'), None)
+
+
 # Ищем последовательные stmt и удаляем лишние, пока не будет максимум 3 штуки подряд
 
 MAX_STMTS = 3
@@ -265,32 +285,86 @@ def shrink_linear_stmts(g, gl, max_stmts=MAX_STMTS):
 			if i2 - begin_i + 1 > MAX_STMTS:
 				continuous_sequences.append(tuple(range(begin_i, i2 + 1)))
 
-			def remove_node_from_sequence(node:GView):
-				# reassign `:next` links & `item_index` numbers
-				body_node = node.value(~gl(':body_item'))  # == subj
-				prev_node = node.value(~gl(':next'))
-				next_node = node.value(gl(':next'))
-				node.remove(':next', next_node)
-				body_node.remove(':body_item', node)
-				node.remove(None, None)  # del this node completely
-				if next_node:
-					prev_node.setvalue(':next', next_node)
-					# renumber the rest of nodes
-					i = node.item_index
-					while i is not None and next_node:
-						next_node.setvalue(':next_node', i)
-						next_node = next_node.value(':next')
-						i += 1
-				else:
-					prev_node.remove(gl(':next'), None)
+			# was here: `def remove_node_from_sequence`
 
 			# print(continuous_sequences)
 			for seq in continuous_sequences:
 				to_remove = seq[2:-1]  # retain first 2 and last 1
-				print('removing linear statements:', to_remove)
+				print('\t- removing linear statements:', len(to_remove))
 				for node_i in to_remove:
-					remove_node_from_sequence(index2stmt[node_i])
+					remove_node_from_sequence(index2stmt[node_i], gl)
 
+
+
+def flatten_simple_blocks(g, gl):
+	'Take up statements within ordinal code block (when not a loop body or if/else branch)'
+
+	for parent, block in set(g.subject_objects(gl(':body_item') / gl(':body_item') / ~gl(':body_item'))):
+		# # subject_objects
+
+		# stmt_count = sum( ((obj, RDF.type, STMT_class) in g) for obj in g.objects(subj, gl(':body_item')))
+		# if stmt_count > max_stmts:
+		# 	# print(subj.n3(), '->', stmt_count, '###', w[':body_item'])
+
+		if (block, RDF.type, gl(':sequence')) in g:
+
+
+			w = GView(g, block, gl)
+			index2stmt = {
+				node.item_index : node.s
+				for node in w[':body_item']
+				if isinstance(node, GView)   ### take all ##  and node.exists(RDF.type, STMT_class)
+			}
+			# print(index2stmt)
+			indices = sorted(index2stmt.keys())
+			# print(indices)
+
+			# remove block extra layer, bring inner actions up
+
+			# handle beginning
+			inner_first = index2stmt[indices[0]]
+			assert (inner_first, RDF.type, gl(':first_item')) in g, indices;
+			if (block, RDF.type, gl(':first_item')) in g:
+				pass  # no need to change `first_item` mark
+				item_index_last = 0 - 1
+			else:
+				# re-label beginning
+				g.remove((inner_first, RDF.type, gl(':first_item')))
+				# re-connect beginning
+				prev = g.value(None, gl(':next'), block)
+				g.remove((prev, gl(':next'), block))
+				g.add((prev, gl(':next'), inner_first))
+				item_index_last = g.value(prev, gl(':item_index'), None).toPython();
+				item_index_last = item_index_last + 1;
+
+			# move every action up
+			for index in indices:
+				inner = index2stmt[index]
+				g.remove((block, gl(':body_item'), inner))
+				g.add((parent, gl(':body_item'), inner))
+				item_index_last += 1
+				g.set((inner, gl(':item_index'), rdflib.Literal(item_index_last)))
+
+			# handle end
+			inner_last = index2stmt[indices[-1]]
+			assert (inner_last, RDF.type, gl(':last_item')) in g, indices;
+			if (block, RDF.type, gl(':last_item')) in g:
+				pass  # no need to change `last_item` mark
+			else:
+				# re-label beginning
+				g.remove((inner_last, RDF.type, gl(':last_item')))
+				# re-connect beginning
+				next_ = g.value(block, gl(':next'), None)
+				g.remove((block, gl(':next'), next_))
+				g.add((inner_last, gl(':next'), next_))
+
+				# re-index every remaining actions
+				while next_:
+					item_index_last += 1
+					g.set((next_, gl(':item_index'), rdflib.Literal(item_index_last)))
+					next_ = g.value(next_, gl(':next'), None)
+
+			# done.
 
 
 def find_subject_of_type(g, class_uri):

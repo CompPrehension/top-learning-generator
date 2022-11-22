@@ -5,6 +5,7 @@
 ftp_base: "c:/data/compp/control_flow/"
 ftp_download_base: "c:/data/compp/control_flow/"
 
+src_ttl_dir: "c:/Temp2/cf_v9-expr-concepts/__result"
 
 fuseki_host: null
 rdf_db_name: cf_pi

@@ -33,8 +33,8 @@ NAME_PROPERTIES = (':stmt_name', ':name', )
 
 UPDATE_TYPE_4_STMTS = (
         'return',
-        # 'break',
-        # 'continue',
+        'break',
+        'continue',
     )
 
 
@@ -50,14 +50,15 @@ STMT_SEP = ';'
 # }
 
 VAR_REPLACEMENTS = ("count", "len", "tmp", "stmp", "vdr", "conf", "ptr", "freq", "loc", "per", "bind", "dur", "service", "num", "apid", "copy")
+DIGITS = tuple(map(str, range(7)))
 OPERATION_CHARS = set("=+-<>()*/&|")
 
-NO_REPEAT_GUARD_COUNT = 4
+NO_REPEAT_GUARD_COUNT = 5
 _NO_REPEAT_GUARD = []
 
-def randName(*_):
+def randName(a1=None, use=(), *_):
     while True:
-        val = choice(VAR_REPLACEMENTS)
+        val = choice(VAR_REPLACEMENTS + use)
         if val not in _NO_REPEAT_GUARD:
             _NO_REPEAT_GUARD.insert(0, val)
             _NO_REPEAT_GUARD[:] = _NO_REPEAT_GUARD[:NO_REPEAT_GUARD_COUNT]
@@ -93,7 +94,7 @@ def shortenNames(s):
 
 def make_call_if_plain_name(s):
     if not (set(s) & OPERATION_CHARS):
-        s += "("+ randName() +")"
+        s += "("+ randName(use=DIGITS) +")"
     return s
 
 
@@ -131,6 +132,14 @@ def fix_name_v3(s, refine_statements=()):
             else:
                 s = 'result = ' + s.strip()
 
+    if s in refine_statements:
+        return s, s  # finish now
+
+    if len(s) < 2 or (-1 < s.find("(") <= 2):
+        s = randName() + "(" + randName(use=DIGITS) + ")"
+        return s, refined_statement_type
+
+
     # сокращение строковых литералов
     if len(s) > MAX_LENGTH_LIMIT:
         def handle_literal(m):
@@ -144,12 +153,12 @@ def fix_name_v3(s, refine_statements=()):
                     )
         s = re.sub(r'\".*?(?<!\\)\"|\'.*?(?<!\\)\'', handle_literal, s)
     else:
-        # exit early (type refinement should be done before this point)
+        # exit early since length is OK (type refinement should be done before this point)
         return s, refined_statement_type
 
     s = re.sub(r'\\ *&|\\ *\|', lambda m: m[0].replace("\\", ""), s)
     s = re.sub(r'&?0x\w+', lambda m: "_" + randName(), s)
-    s = re.sub(r'\[.+?\]', lambda m: "[" + randName() + "]", s)
+    s = re.sub(r'\[.+?\]', lambda m: "[" + randName(use=DIGITS) + "]", s)
     s = re.sub(r'{.+?}', randName, s)
 
     if "(" in s and len(s) > MAX_LENGTH_LIMIT:
@@ -172,6 +181,12 @@ def fix_name_v3(s, refine_statements=()):
         if pos == -1:
             break
         s = s[:pos]
+
+    if s.count(" = ") > 1:
+    	s = " = ".join(s.split(" = ")[-2:])
+
+    if len(s) < MAX_LENGTH_LIMIT:
+    	return s, refined_statement_type
 
     while len(s) > MAX_LENGTH_LIMIT:
         pos = max(s.rfind("+"),
@@ -235,10 +250,6 @@ def fix_name_v3(s, refine_statements=()):
     while s.startswith('(') and s.endswith(')'):
         s = s[1:-1].strip()
 
-    if len(s) < 2 or (-1 < s.find("(") <= 2):
-        s = randName() + "(" + randName() + ")"
-        return s, refined_statement_type
-
     s = make_call_if_plain_name(s)
     return s, refined_statement_type
 
@@ -276,14 +287,14 @@ def fix_name_v3(s, refine_statements=()):
 
 
 # store fixed strings to be reused
-_FIXED_NAMES = {}  # hash_of_original_string -> (new_name, type)
+# _FIXED_NAMES = {}  # hash_of_original_string -> (new_name, type)
 def fix_name_cached(old_name, *args):
-    hs = hash(old_name)
-    if hs in _FIXED_NAMES:
-        return _FIXED_NAMES[hs]
-    else:
+    # hs = hash(old_name)
+    # if hs in _FIXED_NAMES:
+    #     return _FIXED_NAMES[hs]
+    # else:
         result = fix_name_v3(old_name, *args)
-        _FIXED_NAMES[hs] = result
+        # _FIXED_NAMES[hs] = result
         return result
 
 
@@ -304,15 +315,15 @@ def fix_names_for_leaf_types(g, gl, quiet=False):
             # node_type = next(iter(node_types & leaf_types))
             # fixed_name = fix_name(old_name, node_type.toPython()[-4:])
             fixed_name, new_type = fix_name_cached(old_name, UPDATE_TYPE_4_STMTS)
-            assert len(fixed_name) > 2, (old_name, fixed_name, s)
+            assert len(fixed_name) > 0, (old_name, fixed_name, s)
             assert len(fixed_name) < MAX_LENGTH_LIMIT * 1.5, (old_name, fixed_name, s)
-            if fixed_name != old_name:
+            if fixed_name != old_name.strip(STMT_SEP):
                 # set back to graph
                 g.set((s, p, Literal(fixed_name)))
                 changed = True
                 if not quiet:
                     # print(old_name, '\t -->')
-                    print('\t-->', fixed_name)
+                    print('\t\t-->', fixed_name)
             if new_type:
                 new_type_uri = gl(':' + new_type)
                 if new_type_uri not in node_types:

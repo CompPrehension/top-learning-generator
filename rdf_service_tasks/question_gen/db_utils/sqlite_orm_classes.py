@@ -57,13 +57,13 @@ class Questions(BaseModel):
     integral_complexity = FloatField(null=True)
     law_bits = IntegerField(null=True)
     name = TextField(null=True)
+    q_data_graph = TextField(null=True)
     q_graph = TextField(null=True)
-    q_s_graph = TextField(null=True)
     solution_steps = IntegerField(null=True)
     solution_structural_complexity = FloatField(null=True)
-    src_path = TextField(null=True)
     tag_bits = IntegerField(null=True)
     template = ForeignKeyField(column_name='template_id', field='id', model=Templates)
+    violation_bits = IntegerField(null=True)
 
     class Meta:
         table_name = 'questions'
