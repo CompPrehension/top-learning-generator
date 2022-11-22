@@ -47,13 +47,13 @@ def download_questions(offset=None, stop=None, step=None):
 
         # gl = graph_lookup(g, PREFIXES)
 
-        process_question(g, qtname)
+        visualize_question(g, qtname)
 
         # file_out = RDF_DIR + qtname + EXT_OUT
         # g.serialize(file_out, format=FORMAT_OUT)
 
 
-def process_questions_by_names(names=()):
+def visualize_questions_by_names(names=()):
 
     print('Starting ....')
     print('Questions to process: %d' % len(names))
@@ -64,7 +64,7 @@ def process_questions_by_names(names=()):
         print("========")
         g = getQuestionModel(qtname, GraphRole.QUESTION)
         # gl = graph_lookup(g, PREFIXES)
-        process_question(g, qtname)
+        visualize_question(g, qtname)
         # file_out = RDF_DIR + qtname + EXT_OUT
         # g.serialize(file_out, format=FORMAT_OUT)
 
@@ -171,6 +171,7 @@ def convert_graph_to_json(g):
                    stmt_name))
         else:
             print('no `stmt_name` for', a)
+            raise ValueError('no `stmt_name` for', a)
 
 
     g.bind('', NS_code.get()) # set namespace for gl
@@ -182,10 +183,11 @@ def convert_graph_to_json(g):
     # fix act_name(s) to be dict(s)
     ## TODO ...
 
+    ### print('debug save g'); g.serialize('c:/temp/g.ttl', format='turtle')
     return a_json
 
 
-def process_question(g, qtname):
+def visualize_question(g, qtname):
     patch_graph(g)
 
     if 0: ###
@@ -229,7 +231,7 @@ def read_List_from_file(fpath:str):
 if __name__ == '__main__':
     if 0:
         names = read_List_from_file(r'c:\Users\Olduser\Downloads\selected_questions-names.csv')
-        process_questions_by_names(names[203:])
+        visualize_questions_by_names(names[203:])
         exit(0)
 
     if 0:
@@ -243,7 +245,7 @@ if __name__ == '__main__':
         # qtname = 'SDL_CondWaitTimeout'
         qtname = 'cJSON_GetArraySize_v010'
         g = getQuestionModel(qtname, GraphRole.QUESTION)
-        process_question(g, qtname)
+        visualize_question(g, qtname)
 
         exit(0)
 

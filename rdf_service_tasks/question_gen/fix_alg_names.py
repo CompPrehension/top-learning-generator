@@ -29,7 +29,7 @@ def fix_names_in_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True, fix_leaf_nam
 
 
 # look for names in triples with these properties
-name_properties = (':stmt_name', ':name', )
+NAME_PROPERTIES = (':stmt_name', ':name', )
 
 UPDATE_TYPE_4_STMTS = (
         'return',
@@ -41,15 +41,15 @@ UPDATE_TYPE_4_STMTS = (
 #  1. "Смысловые" имена условий и простых действий
 
 
-max_length_limit = 35
+MAX_LENGTH_LIMIT = 35
 
-stmt_sep = ';'
+STMT_SEP = ';'
 # noop_replacements = {
 #     'stmt': ('log.debug(OK)', 'log.info(IN_PROGRESS)', 'log.warn(UNEXPECTED)', 'unlock()', 'lock()', 'wait()',),
 #     'expr': ('free()', 'busy()', 'ENABLED', ),
 # }
 
-VAR_REPLACEMENTS = ("count", "len", "tmp", "stmp", "vdr", "conf", "ptr", "freq", "loc", "per", "ptr", "srate", "service", "num", "apid", "copy")
+VAR_REPLACEMENTS = ("count", "len", "tmp", "stmp", "vdr", "conf", "ptr", "freq", "loc", "per", "bind", "dur", "service", "num", "apid", "copy")
 OPERATION_CHARS = set("=+-<>()*/&|")
 
 NO_REPEAT_GUARD_COUNT = 4
@@ -86,7 +86,7 @@ def shorten_identifier(s):
 
 
 def shortenNames(s):
-    if len(s) > max_length_limit:
+    if len(s) > MAX_LENGTH_LIMIT:
         s = re.sub(r'\b[a-zA-Z_]\w+', shorten_identifier, s)
     return s
 
@@ -110,19 +110,19 @@ def fix_name_v3(s, refine_statements=()):
         s = s.partition("// ")[0].strip()
     if "/*" in s:
         s = s.partition("/*")[0].strip()
-    s = s.strip(stmt_sep)
+    s = s.strip(STMT_SEP)
 
     # handle RETURN
     if s.lower() == 'return':
         if 'return' in refine_statements:
-            s = ''
+            # s = ''
             refined_statement_type = 'return'
             return s, refined_statement_type  # finish now
         else:
             s = 'result = 1'
     elif re.match(r'return\b', s, flags=re.I):
         if 'return' in refine_statements:
-            s = s[len('return'):].strip()  # cut 'return' and continue processing
+            # s = s[len('return'):].strip()  # ! cut 'return' and continue processing
             refined_statement_type = 'return'
         else:
             s = s.replace('return', '', 1)
@@ -132,7 +132,7 @@ def fix_name_v3(s, refine_statements=()):
                 s = 'result = ' + s.strip()
 
     # сокращение строковых литералов
-    if len(s) > max_length_limit:
+    if len(s) > MAX_LENGTH_LIMIT:
         def handle_literal(m):
             s = m[0]
             if len(s) > 8:
@@ -152,28 +152,28 @@ def fix_name_v3(s, refine_statements=()):
     s = re.sub(r'\[.+?\]', lambda m: "[" + randName() + "]", s)
     s = re.sub(r'{.+?}', randName, s)
 
-    if "(" in s and len(s) > max_length_limit:
+    if "(" in s and len(s) > MAX_LENGTH_LIMIT:
         paren_pos = s.find("(")
         left_part = s[:paren_pos]
         right_part = s[paren_pos + 1 :]
         if "(" in right_part:
             right_part = re.sub(r'\w+?\(.+?\)', randName, right_part)
             right_part = shortenNames(right_part)
-        while len(left_part) + 1 + len(right_part) > max_length_limit and "," in right_part:
+        while len(left_part) + 1 + len(right_part) > MAX_LENGTH_LIMIT and "," in right_part:
             right_part = right_part.rpartition(",")[0] + ")"
 
         s = left_part + "(" + right_part.strip()
 
     s = shortenNames(s)
 
-    while len(s) > max_length_limit:
+    while len(s) > MAX_LENGTH_LIMIT:
         pos = max(s.rfind(" &"),
                   s.rfind(" |"))
         if pos == -1:
             break
         s = s[:pos]
 
-    while len(s) > max_length_limit:
+    while len(s) > MAX_LENGTH_LIMIT:
         pos = max(s.rfind("+"),
                   s.rfind("/"),
                   s.rfind("+"),
@@ -186,7 +186,7 @@ def fix_name_v3(s, refine_statements=()):
 
     if "(" not in s and ")" not in s and "," in s:
         s = s.partition(",")[0].strip()
-        s = s.strip(stmt_sep)
+        s = s.strip(STMT_SEP)
 
     curly_open = s.find("{")
     if curly_open != -1:
@@ -197,7 +197,7 @@ def fix_name_v3(s, refine_statements=()):
 
     if ";" in s:
         s = s.partition(";")[0].strip()
-        s = s.strip(stmt_sep)
+        s = s.strip(STMT_SEP)
 
     s = balance_brackets(s)
 
@@ -228,16 +228,16 @@ def fix_name_v3(s, refine_statements=()):
     while "  " in s:
         s = s.replace("  ", " ")
 
-    if len(s) < 2 or (-1 < s.find("(") <= 2):
-        s = randName() + "(" + randName() + ")"
-        return s, refined_statement_type
-
     # удалить внешние символы операций, ";" и пробелы
-    s = s.strip(stmt_sep + ' \t' + ''.join(OPERATION_CHARS - set("()")))
+    s = s.strip(STMT_SEP + ' \t' + ''.join(OPERATION_CHARS - set("()")))
 
     # удалить парные круглые скобки вокруг
     while s.startswith('(') and s.endswith(')'):
         s = s[1:-1].strip()
+
+    if len(s) < 2 or (-1 < s.find("(") <= 2):
+        s = randName() + "(" + randName() + ")"
+        return s, refined_statement_type
 
     s = make_call_if_plain_name(s)
     return s, refined_statement_type
@@ -249,7 +249,7 @@ def fix_name_v3(s, refine_statements=()):
     # if "#define" in s:
     #     s = s.partition("#define")[0].strip()
 
-    # s = s.strip(stmt_sep)
+    # s = s.strip(STMT_SEP)
 
     # # replace RETURN
     # if s.lower() == 'return':
@@ -264,8 +264,8 @@ def fix_name_v3(s, refine_statements=()):
     # if not s:
     #     return choice(noop_replacements.get(node_type) or [n for L in noop_replacements for n in L])
 
-    # if len(s) > max_length_limit:
-    #     m = re.search(r'[\w\d]+\([^)]{,%d}\)' % (max_length_limit - 10), s)
+    # if len(s) > MAX_LENGTH_LIMIT:
+    #     m = re.search(r'[\w\d]+\([^)]{,%d}\)' % (MAX_LENGTH_LIMIT - 10), s)
     #     if m:
     #         s = m[0] # replace all command with a smaller inner call
     #     else:
@@ -292,9 +292,9 @@ def fix_name_cached(old_name, *args):
 def fix_names_for_leaf_types(g, gl, quiet=False):
     changed = False
     new_types_assigned = set()
-    leaf_types = set(map(gl, (':expr', ':stmt', ':return')))
+    leaf_types = set(map(gl, (':expr', ':stmt', ':return', ':break', ':continue')))
 
-    for prop in name_properties:
+    for prop in NAME_PROPERTIES:
         for s,p,o in g.triples((None, gl(prop), None)):
             node_types = set(g.objects(s, RDF.type))
             if not (node_types & leaf_types):
@@ -304,6 +304,8 @@ def fix_names_for_leaf_types(g, gl, quiet=False):
             # node_type = next(iter(node_types & leaf_types))
             # fixed_name = fix_name(old_name, node_type.toPython()[-4:])
             fixed_name, new_type = fix_name_cached(old_name, UPDATE_TYPE_4_STMTS)
+            assert len(fixed_name) > 2, (old_name, fixed_name, s)
+            assert len(fixed_name) < MAX_LENGTH_LIMIT * 1.5, (old_name, fixed_name, s)
             if fixed_name != old_name:
                 # set back to graph
                 g.set((s, p, Literal(fixed_name)))
@@ -357,10 +359,10 @@ def shortname_for_type(type_name, **kw):
 # fix names of leaf_types
 
 def fix_names_for_complex_types(g, gl, quiet=False):
-    complex_types = {n for n in g.objects(None, RDF.type)} - set(map(gl, (':expr', ':stmt',    ':linked_list', ':algorithm', ':else', ':if', ':else-if', ':last_item', ':first_item', 'owl:NamedIndividual')))
+    complex_types = {n for n in g.objects(None, RDF.type)} - set(map(gl, (':expr', ':stmt',    ':linked_list', ':algorithm', ':else', ':if', ':else-if', ':last_item', ':first_item', 'owl:NamedIndividual', ':return', ':break', ':continue')))
 
 
-    for prop in name_properties:
+    for prop in NAME_PROPERTIES:
         for s,p,o in g.triples((None, gl(prop), None)):
             node_types = set(g.objects(s, RDF.type))
             if not (node_types & complex_types):
