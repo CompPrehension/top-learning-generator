@@ -8,6 +8,7 @@
 import json
 from math import exp
 import math
+import random  # using random.seed
 import re
 import sys
 
@@ -27,11 +28,16 @@ from sparql_wrapper import Sparql
 from analyze_alg import jsObj
 
 import sqlite_questions_metadata as dbmeta
+from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, createQuestionTemplateDB, createQuestionDB
+
+
 sys.path.insert(1, '../../../c_owl/')
 if 0:
     # just for debugger to see the code in different directory
     from ....c_owl.ctrlstrct_test import make_question_dict_for_alg_json
+    from ....c_owl.ctrlstrct_run import run_jenaService_with_rdfxml
 from ctrlstrct_test import make_question_dict_for_alg_json
+from ctrlstrct_run import run_jenaService_with_rdfxml
 ### inspecting loading of qG
 from common_helpers import Checkpointer
 
@@ -395,6 +401,7 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_
 
         if qG:
             qNode = findQuestionByName(questionName)
+            # qNode = findQuestionOrTemplateByNameDB(questionName)
             if qNode:
                 targetGraphUri = qG.value(
                     qNode,
@@ -413,7 +420,7 @@ def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_
 
 
 def getSubpathForQuestionGraph(name, role:GraphRole, file_ext=".ttl", fileService=fileService):
-    file_path = GraphRole.QUESTION_TEMPLATE.ns().get(name)
+    file_path = role.ns().get(name)
     if not file_path.endswith(file_ext):
         file_path += file_ext
     return fileService.prepareNameForFile(file_path);
@@ -429,6 +436,7 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
         fileService.sendModel(qgUri, model);
     # update questions metadata
     questionNode = questionNode or findQuestionByName(questionName)
+    # questionNode = questionNode or findQuestionOrTemplateByNameDB(questionName)
     assert questionNode, 'question node must present!'
     qgNode = NS_file.get(qgUri);
 
@@ -464,18 +472,20 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
         print('      SPARQL: insert concepts query response-code:', res.response.code)
 
 
-def setQuestionSubgraphDB(row_instance, role, model: Graph, subgraph_path=None, fileService=fileService):
+def setQuestionSubgraphDB(row_instance, role, new_stage:int, model: Graph, subgraph_path=None, fileService=fileService, _debug_path_suffix=None):
     # qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     file_subpath = subgraph_path or getSubpathForQuestionGraph(row_instance.name, role)
     db_field_name = tableFieldForRoleDB(role)
 
     if model:
+        if _debug_path_suffix:
+            file_subpath += _debug_path_suffix
         fileService.sendModel(file_subpath, model);
 
     # update question's metadata
     setattr(row_instance, db_field_name, file_subpath)
 
-    if model:
+    if model and role == GraphRole.QUESTION_TEMPLATE:
         # copy has_concept relations to metadata graph (into questions/ NS) ...
         has_concept = rdflib.URIRef(NS_code.get("has_concept"))
 
@@ -484,7 +494,8 @@ def setQuestionSubgraphDB(row_instance, role, model: Graph, subgraph_path=None, 
         dbmeta.update_bit_field(row_instance, 'concept_bits', dbmeta.names_to_bitmask(concepts, entity=dbmeta.Concepts))
 
 
-    row_instance._stage = dbmeta.STAGE_QT_CREATED
+    if new_stage > row_instance._stage:
+        row_instance._stage = new_stage
     row_instance._version = dbmeta.TOOL_VERSION
     row_instance.save()
 
@@ -514,6 +525,99 @@ def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileServic
         if (role == topRole): break;
     return m
 
+
+def getQuestionModelDB(qt_or_q, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
+    if topRole.ordinal() >= GraphRole.QUESTION.ordinal() and isinstance(qt_or_q, dbmeta.Questions):
+        qt = qt_or_q.template
+        q = qt_or_q
+    else:
+        qt = qt_or_q
+        q = None
+
+    m = Graph();
+    for role in questionStages():
+        if q and role.ordinal() >= GraphRole.QUESTION.ordinal():
+            qt_or_q = q
+        else:
+            qt_or_q = qt
+
+        subpath = getattr(qt_or_q, tableFieldForRoleDB(role))
+        assert subpath, (qt_or_q.name, role)
+        gm = fileService.fetchModel(subpath);
+        if gm:
+            m += gm;
+
+        if (role == topRole): break;
+    return m
+
+__schema4solving__m = None
+
+def solve_template_with_jena(m: Graph, verbose=False, schema_path=r'c:/D/Work/YDev/CompPr/c_owl/jena/control-flow-statements-domain-schema.rdf') -> Graph:
+    global __schema4solving__m
+    if not __schema4solving__m:
+        __schema4solving__m = Graph().parse(schema_path)
+
+    rdfxml_bytes = (m + __schema4solving__m).serialize(format="xml").encode()
+    n3_bytes = run_jenaService_with_rdfxml(rdfxml_bytes, alg_only=True)
+
+    assert n3_bytes, n3_bytes
+
+    g = Graph().parse(data=n3_bytes, format='nt')
+    initial_size = len(g)
+    # leave only new triples
+    g -= m
+    g -= __schema4solving__m
+
+    if verbose:
+        print(f"\t* reasoning result graph has triples: {initial_size} (-> {len(g)})")
+
+    g.bind('', NS_code.get())  # set default namespace
+    return g
+
+
+
+def solve_templates(limit=None) -> int:
+    ''' using jena via c_owl
+    '''
+
+    # templates_total = 0
+    done_count = 0
+
+    # qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_CREATED, limit)
+    qt_list = dbmeta.findTemplatesOnStageDB(2, limit)  # solved: to re-solve
+    if not qt_list:
+        return 0
+
+    # from full_questions import repair_statements_in_graph
+
+    ch = Checkpointer()
+
+    for qt in qt_list:
+
+        # path = CONFIG.src_ttl_dir + (qt.src_path)
+        # with open(path) as f:
+        #     m = _patch_and_parse_ttl(f)
+        m = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE)
+
+        # solve...
+        try:
+            m = solve_template_with_jena(m, verbose=True)
+        except Exception:
+            print(f'error with "{qt.name}"')
+            # raise
+            continue
+
+        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE_SOLVED, dbmeta.STAGE_QT_SOLVED, m)
+        done_count += 1
+        if done_count % 20 == 0:
+            ch.hit(        '   + 20 templates solved')
+            ch.since_start('[%3d] time elapsed so far:' % done_count)
+
+    ch.since_start("Solving templates completed, in")
+    print("Solved", done_count, 'templates of', len(qt_list), 'currently selected.')
+    return len(qt_list)
+
+
 __PATCH_TTL_RE = None
 
 def _patch_and_parse_ttl(opened_file):
@@ -534,7 +638,9 @@ def load_templates(limit=None) -> int:
     # templates_total = 0
     done_count = 0
 
-    qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
+    # qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
+    ### re
+    qt_list = dbmeta.findTemplatesOnStageDB(stage = None and dbmeta.STAGE_QT_USED, limit=limit, version=dbmeta.TOOL_VERSION - 1)
     if not qt_list:
         return 0
 
@@ -549,16 +655,21 @@ def load_templates(limit=None) -> int:
             m = _patch_and_parse_ttl(f)
 
         try:
+            random.seed(hash(qt.name))  # make what random produces stable
             m = repair_statements_in_graph(m)
         except AssertionError:
             print(f'error with "{qt.name}"')
             # raise
+            # mark the error
+            qt._stage = 10 + dbmeta.STAGE_QT_CREATED
+            qt.save()
+            continue
 
-        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, m)
+        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED, m)  ### , _debug_path_suffix='.v2'
         done_count += 1
         if done_count % 20 == 0:
-	        ch.hit(        '   + 20 templates created')
-	        ch.since_start('[%3d] time elapsed so far:' % done_count)
+            ch.hit(        '   + 20 templates created')
+            ch.since_start('[%3d] time elapsed so far:' % done_count)
 
     ch.since_start("Loading templates completed, in")
     print("Loaded", done_count, 'templates of', len(qt_list), 'currently selected.')
@@ -797,6 +908,8 @@ CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_
 
 def question_metrics(g, gl, question_dict, quiet=False):
     data = {}
+    add_structural_feature_concepts = True
+    concepts = []
 
     # actions_count
     query = 'SELECT (COUNT(distinct ?s) as ?n) where {?s a :action}'
@@ -846,13 +959,15 @@ def question_metrics(g, gl, question_dict, quiet=False):
         ]
         data['max_loop_nesting_depth'] = max(nest_depths) + 1
 
+        if add_structural_feature_concepts and data['max_loop_nesting_depth'] >= 2:
+            concepts.append('nested_loop')  # note the name introduced here
+
 
     #### cyclomatic = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condtion count.
-    values_count_plus_1 = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condtion count.
+    values_count_plus_1 = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condition count.
 
     tags = ["C++", "trace"]
 
-    concepts = []
     for concept in CONCEPT_CANDIDATES:
         if (None, RDF.type, gl(':' + concept)) in g:
             concepts.append(concept)
@@ -884,6 +999,7 @@ def question_metrics(g, gl, question_dict, quiet=False):
         has_concept = tuple(sorted(concepts)),
         has_law = tuple(sorted(question_dict['laws'])),
         has_violation = tuple(sorted(question_dict['possible_violations'])),
+        structural_complexity = data['actions_count'] + data['cyclomatic'],
         **data
     )
 
@@ -892,9 +1008,16 @@ import time
 CREATE_TRACES_TIMEOUT = 15  # seconds
 
 
-def process_template(qtname, questions_count=0):
-    g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
+def process_template(qt, questions_counter=0, clamp_complexity=(0.1, 0.6)):
+    qtname = qt if isinstance(qt, str) else qt.name
+
+    # g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
+    g = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE_SOLVED)
     gl = graph_lookup(g, PREFIXES)
+
+    # from full_questions import repair_statements_in_graph
+    # g = repair_statements_in_graph(g, gl)
+
 
     # old code: just call it
     # questions = generate_questions_for_algorithm(g, gl)
@@ -936,17 +1059,32 @@ def process_template(qtname, questions_count=0):
     if not questions:
         return 0
 
+    seen_names = set()
+    used_questions = 0
+
     for question in questions:
+        if question['name_suffix'] in seen_names:
+            continue  # prevent processing duplicates
+        seen_names.add(question['name_suffix'])
+
         print()
-        suffix = question['name_suffix'] or ('_nocond_q%d' % questions_count)
+        metrics = question_metrics(g, gl, question)
+        if clamp_complexity:
+            complexity = metrics['integral_complexity']
+            low, high = clamp_complexity
+            if not (low <= complexity <= high):
+                continue
+
+        suffix = question['name_suffix'] or ('_nocond_q%d' % questions_counter)
         question_name = '%s_v%s' % (qtname, suffix)
-        file_path = nameForQuestionGraph(question_name, GraphRole.QUESTION)
+
+        file_path = getSubpathForQuestionGraph(question_name, GraphRole.QUESTION)
+        # file_path = nameForQuestionGraph(question_name, GraphRole.QUESTION)
         assert file_path, question_name
         print("  Saving question: ", question_name, ' --> ', file_path)
         ### continue
 
-        #### gUri = NS_file.get(GraphRole.QUESTION.ns().get(file_path))
-        gUri = NS_file.get(file_path)
+
         model = question['rdf']
         print("    Uploading model ...")  # "for question '%s' ... " % question_name)
         # uploadGraph(gUri, model, fuseki_update)
@@ -958,49 +1096,47 @@ def process_template(qtname, questions_count=0):
             except:
                 continue
 
-        qUri = createQuestion(question_name, qtname, gUri, question_metrics(g, gl, question))
-        print("  Question URI:", qUri)
 
-    return len(questions)
+        q = dbmeta.createQuestionDB(question_name, qt, q_graph=file_path, metrics=metrics)
+        used_questions += 1
+
+        # gUri = NS_file.get(file_path)
+        # qUri = createQuestion(question_name, qtname, gUri, metrics)
+        # print("  Question URI:", qUri)
+
+    return used_questions
 
 
 
 def generate_questions_for_templates(offset=None, limit=None):
 
     print("Requesting templates without questions ...", flush=True)
-    if limit:
-        sparql_limit = limit
-        limit = None
-    else:
-        sparql_limit = None
-    templates_to_create_questions = templatesWithoutQuestions(sparql_limit)
+    # if limit:
+    #     sparql_limit = limit
+    #     limit = None
+    # else:
+    #     sparql_limit = None
+    # templates_to_create_questions = templatesWithoutQuestions(sparql_limit)
+    templates_to_create_questions = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_SOLVED, limit)
 
     ### debugging: get existing questions instead
     # templates_to_create_questions = list({n[:n.rfind("_v")] for n in unsolvedQuestions(GraphRole.QUESTION_SOLVED)})
 
 
     print('Templates without questions found: %d' % len(templates_to_create_questions))
-    ### return
 
     # print(*templates_to_create_questions, sep='\n')
     # exit()
 
+    templates_used = 0
     questions_count = 0
     skip_count = 0
 
-    # def process_one(qtname):
-    #     nonlocal questions_count
-    #     nonlocal skip_count
-    #     try:
-    #         questions_count += process_template(qtname, questions_count)
-    #     except NotImplementedError as e:
-    #         skip_count += 1
-    #         print()
-    #         print('Error with template: ', qtname)
-    #         print(e)
+    ch = Checkpointer()
 
-
-    for qtname in templates_to_create_questions[offset:limit]:
+    # for qtname in templates_to_create_questions[offset:limit]:
+    for qt in templates_to_create_questions:
+        qtname = qt.name
 
         print()
         print()
@@ -1011,7 +1147,15 @@ def generate_questions_for_templates(offset=None, limit=None):
             print('intended skip.')
             continue
         try:
-            questions_count += process_template(qtname, questions_count)
+            questions_made = process_template(qt, questions_count)
+            questions_count += questions_made
+            templates_used += 1
+            # set even if no questions made, to avoid trying it next time
+            qt._stage = dbmeta.STAGE_QT_USED
+            qt.save()
+            if questions_made > 0:
+                ch.hit(        '   + 1 template used')
+                ch.since_start('[%3d] time elapsed so far:' % (templates_used + skip_count))
         except NotImplementedError as e:
             skip_count += 1
             print()
@@ -1021,48 +1165,64 @@ def generate_questions_for_templates(offset=None, limit=None):
 
 
     print()
-    print(questions_count, 'questions created.')
+    ch.since_start("Completed, in")
+    print(questions_count, 'questions created from', templates_used, 'templates.')
     print('done.')
+    return questions_count
 
 
-def process_question(qname):
+def generate_data_for_question(q_row_instance):
     ''' generating data for question '''
-    g = getQuestionModel(qname, GraphRole.QUESTION)
+    q = q_row_instance
+    qname = q.name
+    g = getQuestionModelDB(q, GraphRole.QUESTION)
     # gl = graph_lookup(g, PREFIXES)
 
     from full_questions import convert_graph_to_json
-
     alg_json = convert_graph_to_json(g)
+
+    # ## dump alg_json to debug
+    # # fileService.sendFile(file_subpath[:-4] + 'src.json',
+    # fileService.sendFile('debug/' + qname + 'src.json',
+    #     # json.dumps(q_dict, ensure_ascii=False).encode()
+    #     json.dumps(alg_json, ensure_ascii=False, indent=2).encode()
+    # )
+    # return 0  # !!!!!!!!!!!!!!!!!!!
+    # ## / dump alg_json to debug
 
     try:
         q_dict = make_question_dict_for_alg_json(alg_json, qname)
 
-        fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
+        # fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
+        file_subpath = getSubpathForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
 
-        print('    Uploading json file ...')
-        fileService.sendFile(fullname,
-            # json.dumps(q_dict, ensure_ascii=False).encode()
-            json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
+        # print('    Uploading json file ...')
+        fileService.sendFile(file_subpath,
+            json.dumps(q_dict, ensure_ascii=False).encode()
+            # json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
         )
 
-        ### dump alg_json to debug
-        # fileService.sendFile(fullname[:-4] + 'src.json',
-        #     # json.dumps(q_dict, ensure_ascii=False).encode()
-        #     json.dumps(alg_json, ensure_ascii=False, indent=2).encode()
-        # )
+        # setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=file_subpath)
+        setQuestionSubgraphDB(q, GraphRole.QUESTION_DATA, dbmeta.STAGE_Q_DATA_SAVED, model=None, subgraph_path=file_subpath)
 
-        setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=fullname)
+        return 1
     except Exception as e:
-        print("exception in process_question:")
+        print("exception in generate_data_for_question:")
         print(e)
         print()
+        # raise
+        q._stage += 10  # mark the error
+        q.save()
+        return 0
 
 
 def generate_data_for_questions(offset=None, limit=None):
 
     print("Requesting questions without data ...", flush=True)
 
-    questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
+    # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
+    # questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_CREATED, limit)
+    questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_DATA_SAVED, limit, dbmeta.TOOL_VERSION - 1)
 
     ### debugging: get all existing questions instead
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
@@ -1073,26 +1233,31 @@ def generate_data_for_questions(offset=None, limit=None):
     questions_count = 0
     skip_count = 0
 
-    for qname in questions_to_process[offset:limit]:
-
+    for q in questions_to_process[offset:limit]:
+        qname = q.name
         print()
         print()
-        print("Processing question: ", qname, "(i: %d)" % questions_count)
+        print("Processing question: ", qname, "(i: %d)" % (questions_count + skip_count))
         print("    (with errors so far: %d)" % skip_count)
         print("========")
         try:
-            process_question(qname)
-            questions_count += 1
-        except NotImplementedError as e:
+            n = generate_data_for_question(q)
+            questions_count += n
+            skip_count += not n
+        except (NotImplementedError, AssertionError) as e:
             skip_count += 1
             print()
             print('Error with question: ', qname)
             print(e)
+            q._stage += 10  # mark the error
+            q.save()
             print()
 
     print()
     print(questions_count, 'questions updated with data.')
+    print(skip_count, 'questions with errors.')
     print('done.')
+    return questions_count
 
 
 
@@ -1377,12 +1542,19 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
         print('graph #%d uploaded:' % (i + 1), path)
 
 
-def automatic_pipeline(batch=300):
-    if load_templates(limit=None) > 0:
-        return
+def automatic_pipeline(batch=700, offset=0):
 
-    # if solve_templates(limit=batch) > 0:
-    #   return
+    # if load_templates(limit=batch) > 20:  # note 14 errors
+    #     return
+
+    # if solve_templates(limit=None) > 0:
+    #     return
+
+    # if generate_questions_for_templates(limit=700) > 0:
+    #     return
+
+    if generate_data_for_questions(offset=offset, limit=300) > 0:
+        return
 
 
     print('everything is done!')
@@ -1401,6 +1573,8 @@ if __name__ == '__main__':
     # find_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=0)
     # find_templates(CONFIG.src_ttl_dir, skip_first=0)
 
+    # automatic_pipeline(15)
+    # automatic_pipeline(300, offset=0)
     automatic_pipeline()
 
 
@@ -1420,3 +1594,16 @@ if __name__ == '__main__':
     # measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION, skip=0)
     # measure_disk_usage_uploading_questions('c:/D/Work/YDev/CompPr/3stores/bench/bsbmtools-0.2/pc2815-1M.ttl')
     print('Bye.')
+
+
+'''
+
+20.11.2022
+----------
+Searching for templates completed.
+Used 17073 files of 25604 in the directory.
+
+1.8 Мб - размер файла sqlite.
+7.0 Мб - размер файла sqlite после создания всей базы на 17+тыс. шаблонов + 23+тыс. вопросов.
+
+'''

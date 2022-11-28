@@ -29,7 +29,7 @@ def fix_names_in_graph(g:rdflib.Graph, gl:graph_lookup, quiet=True, fix_leaf_nam
 
 
 # look for names in triples with these properties
-NAME_PROPERTIES = (':stmt_name', ':name', )
+NAME_PROPERTIES = (':stmt_name', ':name', ':act_name', )
 
 UPDATE_TYPE_4_STMTS = (
         'return',
@@ -126,6 +126,7 @@ def fix_name_v3(s, refine_statements=()):
             # s = s[len('return'):].strip()  # ! cut 'return' and continue processing
             refined_statement_type = 'return'
         else:
+            # mimic 'return' with ordinal statement
             s = s.replace('return', '', 1)
             if 'result' in s.lower():
                 s = 'accept(%s)' % s.strip()
@@ -183,17 +184,17 @@ def fix_name_v3(s, refine_statements=()):
         s = s[:pos]
 
     if s.count(" = ") > 1:
-    	s = " = ".join(s.split(" = ")[-2:])
+        s = " = ".join(s.split(" = ")[-2:])
 
     if len(s) < MAX_LENGTH_LIMIT:
-    	return s, refined_statement_type
+        return s, refined_statement_type
 
     while len(s) > MAX_LENGTH_LIMIT:
         pos = max(s.rfind("+"),
                   s.rfind("/"),
                   s.rfind("+"),
                   s.rfind("-"),
-                  s.rfind(":"),
+                  # s.rfind(":"), # don't break (c?a:b)
                   s.rfind("%"))
         if pos == -1:
             break
@@ -287,14 +288,14 @@ def fix_name_v3(s, refine_statements=()):
 
 
 # store fixed strings to be reused
-# _FIXED_NAMES = {}  # hash_of_original_string -> (new_name, type)
+_FIXED_NAMES = {}  # hash_of_original_string -> (new_name, type)
 def fix_name_cached(old_name, *args):
-    # hs = hash(old_name)
-    # if hs in _FIXED_NAMES:
-    #     return _FIXED_NAMES[hs]
-    # else:
+    hs = hash(old_name)
+    if hs in _FIXED_NAMES:
+        return _FIXED_NAMES[hs]
+    else:
         result = fix_name_v3(old_name, *args)
-        # _FIXED_NAMES[hs] = result
+        _FIXED_NAMES[hs] = result
         return result
 
 
@@ -317,13 +318,13 @@ def fix_names_for_leaf_types(g, gl, quiet=False):
             fixed_name, new_type = fix_name_cached(old_name, UPDATE_TYPE_4_STMTS)
             assert len(fixed_name) > 0, (old_name, fixed_name, s)
             assert len(fixed_name) < MAX_LENGTH_LIMIT * 1.5, (old_name, fixed_name, s)
-            if fixed_name != old_name.strip(STMT_SEP):
+            if fixed_name != old_name:  #### .strip(STMT_SEP):
                 # set back to graph
                 g.set((s, p, Literal(fixed_name)))
                 changed = True
-                if not quiet:
-                    # print(old_name, '\t -->')
-                    print('\t\t-->', fixed_name)
+                # if not quiet:
+                    ## print(old_name, '\t -->')
+                    # print('\t\t-->', fixed_name)
             if new_type:
                 new_type_uri = gl(':' + new_type)
                 if new_type_uri not in node_types:
@@ -370,7 +371,9 @@ def shortname_for_type(type_name, **kw):
 # fix names of leaf_types
 
 def fix_names_for_complex_types(g, gl, quiet=False):
-    complex_types = {n for n in g.objects(None, RDF.type)} - set(map(gl, (':expr', ':stmt',    ':linked_list', ':algorithm', ':else', ':if', ':else-if', ':last_item', ':first_item', 'owl:NamedIndividual', ':return', ':break', ':continue')))
+    complex_types = {n for n in g.objects(None, RDF.type)} - set(map(gl, (':expr', ':stmt',
+        ':action',  # always has a specific version
+        ':linked_list', ':boundary', ':algorithm', ':else', ':if', ':else-if', ':last_item', ':first_item', 'owl:NamedIndividual', 'owl:Thing', ':return', ':break', ':continue')))
 
 
     for prop in NAME_PROPERTIES:
@@ -379,15 +382,20 @@ def fix_names_for_complex_types(g, gl, quiet=False):
             if not (node_types & complex_types):
                 # print([node_type.toPython() for node_type in node_types], '\t', s.toPython())
                 continue
+
+            # subject_objects
+            if (None, gl(':global_code'), s) in g:
+                continue  # no change needed
+
             node_type = next(iter(node_types & complex_types))
             old_name = o.toPython()
             fixed_name = shortname_for_type(pretty_rdf(node_type).strip(':'), g=g, gl=gl, node=s)
-            if fixed_name != old_name:
+            if fixed_name and (fixed_name != old_name):
                 # set back to graph
                 g.set((s, p, Literal(fixed_name)))
                 if not quiet:
-                    print(old_name, '\t -->')
-                    print('\t', fixed_name)
+                    print(old_name, end='\t -->')
+                    print('\t', fixed_name, '(%s)' % node_type)
 
 
 

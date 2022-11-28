@@ -237,7 +237,7 @@ def way_from_transition(bound1, value_gen=None, g=None, gl=None) -> (Way, rdflib
                 "\n\t\t 3 types of '*consequent' transitions supported so far.")
 
         cond_node = g.value(bound1, gl(':boundary_of'), None)
-        assert cond_node
+        assert cond_node, bound1
         cond_name = g.value(cond_node, gl(':stmt_name'), None)
         assert cond_name
         cond_name = str(cond_name)
@@ -486,7 +486,7 @@ def ways_through_inner(st, value_gen, g, gl, bound_from=None, finish_bounds=()):
         # one step
         way_step, bound = way_from_transition(bound, value_gen, g, gl)
         way_parts[-1][0] += way_step
-        if bound in finish_bounds:
+        if  not bound or  bound in finish_bounds:
             break
 
         deeper_st = g.value(bound, gl(':begin_of'), None)

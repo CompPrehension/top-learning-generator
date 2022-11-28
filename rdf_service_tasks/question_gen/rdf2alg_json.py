@@ -208,26 +208,36 @@ class AlgorithmGraphWalker(GView):
 			if k.endswith('_item'):
 				values = _sort_linked_list(values)  # sort according to (s)-->:next-->(o) relations
 						# it could be also done via 'item_index' values but these do not always exist.
+			values = list(dict.fromkeys(values))  # remove possible duplicates, keeping order
 			for i, value in enumerate(values):
 				if isinstance(value, URIRef):
 					values[i] = value.n3(self.g.namespace_manager)
 					# if k in ('rdf:type', ) and values[i] not in LEAF_ACTION_CLASSES: # handle types
-					# 		### print('\tDrop OUT type::::', values[i])
-					# 		values[i] = None
+							### print('\tDrop OUT type::::', values[i])
+							# values[i] = None
+					####
 					if values[i] in ('owl:NamedIndividual', 'owl:Thing', 'Concept', ':first_item', ':last_item', ':linked_list',
 						# ':action', ':loop', ':start_with_cond', ':conditional_loop', ':conditional_loop', ':body_then_cond', ':cond_then_body', ':start_with_init', ':pre_update_loop', ':post_update_loop',
 						):  # hide this nodes as objects
 						values[i] = None
-					else:
+					elif values[i]:
 						values[i] = remove_ns_prefix(values[i])
-				if isinstance(value, AlgorithmGraphWalker):
-					values[i] = value.to_algorithm_json(_visited_nodes)
+				elif isinstance(value, AlgorithmGraphWalker):
+					# check if is a class with annotations
+					if (class_name := remove_ns_prefix(value.s)) in LEAF_ACTION_CLASSES:
+						values[i] = class_name
+					else:
+						values[i] = value.to_algorithm_json(_visited_nodes)
 			values = list(filter(lambda x: x is not None, values))
 			if k in ('rdf:type', ) and len(values) > 1:  # handle types
+
+				### print("\t", self.n3(), "'s Values of 'rdf:type':", values, end=' ;  ')
 				values = [n for n in LEAF_ACTION_CLASSES if n in values][:1]
+				### print("->:", values)
+
 			if not values:
-				print('Empty values for key:::', k)
-				print('             subject:::', self)
+				### print('Empty values for key:::', k)
+				### print('             subject:::', self)
 				continue
 			is_collection = len(values) > 1 or k.endswith('_item')
 			val = list(values) if is_collection else values[0]
@@ -385,14 +395,26 @@ def graph_2_json(g, root_class=NS_code.get('algorithm')):
 	w = AlgorithmGraphWalker(g, algorithm)  # create now to init w.gl used in fix_names_in_graph()
 
 	# 1. FIX names
-	fix_names_in_graph(g, w.gl, fix_complex_names=False)
+	fix_algorithm_graph(g, w.gl)  ####, fix_complex_names=False)
 
-	# # 2. REMOVE some statements
-	# shrink_linear_stmts(g, w.gl)
-
-	# 3. EXPORT to algorithm_json
+	# 2. EXPORT to algorithm_json
 	a_json = w.to_algorithm_json()
 	return a_json
+
+
+def fix_algorithm_graph(g, gl):
+
+	# 1. FIX names
+	# fix_names_in_graph(g, gl, fix_complex_names=True)
+	fix_names_in_graph(g, gl, fix_complex_names=False)
+
+	# 2. REMOVE some nesting levels
+	flatten_simple_blocks(g, gl)
+
+	# 3. REMOVE some statements
+	shrink_linear_stmts(g, gl)
+
+	return g
 
 
 

@@ -169,6 +169,18 @@ def convert_graph_to_json(g):
         g.remove((s, None, None))
         # g.remove((None, None, s))
 
+    # rename global code (update stmt_name)
+    for a in g.objects(None, gl(':global_code')):
+        # print(a, type(a))
+        g.set((a,
+           gl(':stmt_name'),
+           rdflib.Literal("global code")))
+        g.set((a,
+           gl(':act_name'),
+           rdflib.Literal("global code")))
+        print('\tUpdated `stmt_name` to `global_code` for', a)
+
+
     # add act_name to actions (as just a copy of stmt_name)
     for a in g.subjects(RDF.type, gl(':action')):
         stmt_name = g.value(a, gl(':stmt_name'), None)

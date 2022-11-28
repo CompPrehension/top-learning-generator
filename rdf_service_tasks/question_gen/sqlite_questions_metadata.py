@@ -5,13 +5,13 @@ from db_utils.sqlite_orm_classes import *
 
 
 # write to `_version` column to track data generated with older scripts
-TOOL_VERSION = 1
+TOOL_VERSION = 2
 
 # some enum-like constants
 STAGE_QT_FOUND = 0
 STAGE_QT_CREATED = 1
 STAGE_QT_SOLVED = 2
-STAGE_QT_USED = 2
+STAGE_QT_USED = 3  # to make questions (even if no questions exactly created)
 
 STAGE_Q_CREATED = 1
 STAGE_Q_SOLVED = 2
@@ -27,12 +27,22 @@ def findQuestionOrTemplateByNameDB(name):
     return obj
 
 
-def findQuestionsOnStageDB(stage=1, limit=None):
-    iterator = Questions.select().where(Questions._stage == stage).limit(limit).execute()
+def findQuestionsOnStageDB(stage=1, limit=None, version=None):
+    query = Questions.select()
+    if stage:
+	    query = query.where(Questions._stage == stage)
+    if version:
+	    query = query.where(Questions._version == version)
+    iterator = query.limit(limit).execute()
     return list(iterator)
 
-def findTemplatesOnStageDB(stage=1, limit=None):
-    iterator = Templates.select().where(Templates._stage == stage).limit(limit).execute()
+def findTemplatesOnStageDB(stage=1, limit=None, version=None):
+    query = Templates.select()
+    if stage:
+	    query = query.where(Templates._stage == stage)
+    if version:
+	    query = query.where(Templates._version == version)
+    iterator = query.limit(limit).execute()
     return list(iterator)
 
 
@@ -84,7 +94,11 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
     else:
         print()
         print('    ! DB: DUPLICATE of question (id=%d):' % q.id, q.name)
-        print()
+        q.template = template
+        q.q_graph = q_graph
+        q._stage = STAGE_Q_CREATED
+        q._version = TOOL_VERSION
+        # print()
 
     # > add other metadata
 
@@ -93,15 +107,16 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
     qt = q.template
 
     fields_of_collections = {
-        'has_tag':      (Tag,             'tag_bits'),
-        'has_concept':  (Concept,     'concept_bits'),
-        'has_law':      (Law,             'law_bits'),
-        'has_violation':(Violation, 'violation_bits'),
+        'has_tag':      (Tags,             'tag_bits'),
+        'has_concept':  (Concepts,     'concept_bits'),
+        'has_law':      (Laws,             'law_bits'),
+        'has_violation':(Violations, 'violation_bits'),
     }
 
     need_save_qt = False
 
     for name, vals in metrics.items():
+        # set value to Question's field
         if isinstance(vals, (list, tuple)):
             if (entity_field := fields_of_collections.get(name)):
                 entity, name = entity_field  # note: rewrite `name`
@@ -114,6 +129,7 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
                 vals |= getattr(qt, name) or 0
             setattr(q, name, vals)
         elif hasattr(qt, name):
+            # set value to Template's field
             setattr(qt, name, vals)
             need_save_qt = True
         else:
