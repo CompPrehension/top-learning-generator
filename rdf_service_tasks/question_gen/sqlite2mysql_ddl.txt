@@ -1,6 +1,6 @@
 # sqlite2mysql_ddl.txt
 
-
+# from SQLite
 CREATE TABLE questions (
     id                             INTEGER PRIMARY KEY ASC AUTOINCREMENT
                                            NOT NULL
@@ -24,9 +24,11 @@ CREATE TABLE questions (
 
  ====>
 
-CREATE TABLE ctfl_questions (
+# to MySQL
+CREATE TABLE questions_meta (
     id                             INTEGER  NOT NULL AUTO_INCREMENT,
     name                           TEXT,
+    domain_shortname               VARCHAR(45) NOT NULL DEFAULT "ctrl_flow",  # added
     template_id                    INTEGER NOT NULL,
     q_graph                        TEXT,
     q_data_graph                   TEXT,
