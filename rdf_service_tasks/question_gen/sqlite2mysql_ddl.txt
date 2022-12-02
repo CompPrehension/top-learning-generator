@@ -1,0 +1,44 @@
+# sqlite2mysql_ddl.txt
+
+
+CREATE TABLE questions (
+    id                             INTEGER PRIMARY KEY ASC AUTOINCREMENT
+                                           NOT NULL
+                                           DEFAULT (0),
+    name                           TEXT,
+    template_id                    INTEGER REFERENCES templates (id)
+                                           NOT NULL,
+    q_graph                        TEXT,
+    q_data_graph                   TEXT,
+    tag_bits                       INTEGER,
+    concept_bits                   INTEGER,
+    law_bits                       INTEGER,
+    violation_bits                 INTEGER,
+    solution_structural_complexity REAL,
+    integral_complexity            REAL,
+    solution_steps                 INTEGER,
+    distinct_errors_count          INTEGER,
+    _stage                         INTEGER,
+    _version                       INTEGER
+);
+
+ ====>
+
+CREATE TABLE ctfl_questions (
+    id                             INTEGER  NOT NULL AUTO_INCREMENT,
+    name                           TEXT,
+    template_id                    INTEGER NOT NULL,
+    q_graph                        TEXT,
+    q_data_graph                   TEXT,
+    tag_bits                       INTEGER,
+    concept_bits                   INTEGER,
+    law_bits                       INTEGER,
+    violation_bits                 INTEGER,
+    solution_structural_complexity REAL,
+    integral_complexity            REAL,
+    solution_steps                 INTEGER,
+    distinct_errors_count          INTEGER,
+    _stage                         INTEGER,
+    _version                       INTEGER,
+  PRIMARY KEY (`id`)
+);
