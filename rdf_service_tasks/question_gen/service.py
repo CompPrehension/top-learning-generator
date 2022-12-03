@@ -1296,8 +1296,8 @@ def generate_data_for_questions(offset=None, limit=None):
     print("Requesting questions without data ...", flush=True)
 
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
-    # questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_CREATED, limit)
-    questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_DATA_SAVED, limit, dbmeta.TOOL_VERSION - 1)
+    questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_CREATED, limit)
+    # questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_DATA_SAVED, limit, dbmeta.TOOL_VERSION - 1)
 
     ### debugging: get all existing questions instead
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
