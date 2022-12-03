@@ -5,7 +5,7 @@ import itertools
 import re
 
 import rdflib
-from rdflib import Graph, RDF
+from rdflib import Graph, RDF, RDFS
 from rdflib.term import URIRef, Literal
 
 # using patched version of SPARQLBurger
@@ -204,6 +204,17 @@ def uploadGraph(gUri, g, fuseki_update):
     # return res
 
 # uploadGraph('http://n.g/555', qg, fuseki_update)
+
+
+def get_class_descendants_rdf(class_, g, is_a_prop=RDFS.subClassOf) -> set:
+		return set(g.subjects(is_a_prop * '+', class_))
+
+def get_base_classes_rdf(classes, g, is_a_prop=RDFS.subClassOf) -> set:
+		return {sup for cl in classes for sup in g.objects(cl, is_a_prop)}
+
+def get_leaf_classes_rdf(classes, g, is_a_prop=RDFS.subClassOf) -> set:
+		# print(classes, "-" ,base_classes)
+		return set(classes) - get_base_classes_rdf(classes, g, is_a_prop)
 
 
 if __name__ == '__main__':

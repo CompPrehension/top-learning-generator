@@ -22,7 +22,7 @@ from chain_utils import builder
 from GraphRole import GraphRole
 from NamespaceUtil import NamespaceUtil
 from ns4guestions import *
-from rdflib_utils import graph_lookup, uploadGraph
+from rdflib_utils import graph_lookup, uploadGraph, get_class_descendants_rdf, get_leaf_classes_rdf
 from RemoteFileService import RemoteFileService
 from sparql_wrapper import Sparql
 from analyze_alg import jsObj
@@ -552,12 +552,15 @@ def getQuestionModelDB(qt_or_q, topRole=GraphRole.QUESTION_SOLVED, fileService=f
 
 __schema4solving__m = None
 
-def solve_template_with_jena(m: Graph, verbose=False, schema_path=r'c:/D/Work/YDev/CompPr/c_owl/jena/control-flow-statements-domain-schema.rdf') -> Graph:
+def ctrl_flow_schema(schema_path=r'c:/D/Work/YDev/CompPr/c_owl/jena/control-flow-statements-domain-schema.rdf'):
     global __schema4solving__m
     if not __schema4solving__m:
         __schema4solving__m = Graph().parse(schema_path)
+    return __schema4solving__m
 
-    rdfxml_bytes = (m + __schema4solving__m).serialize(format="xml").encode()
+def solve_template_with_jena(m: Graph, verbose=False, ) -> Graph:
+    schema = ctrl_flow_schema()
+    rdfxml_bytes = (m + schema).serialize(format="xml").encode()
     n3_bytes = run_jenaService_with_rdfxml(rdfxml_bytes, alg_only=True)
 
     assert n3_bytes, n3_bytes
@@ -566,7 +569,7 @@ def solve_template_with_jena(m: Graph, verbose=False, schema_path=r'c:/D/Work/YD
     initial_size = len(g)
     # leave only new triples
     g -= m
-    g -= __schema4solving__m
+    g -= schema
 
     if verbose:
         print(f"\t* reasoning result graph has triples: {initial_size} (-> {len(g)})")
@@ -673,6 +676,62 @@ def load_templates(limit=None) -> int:
 
     ch.since_start("Loading templates completed, in")
     print("Loaded", done_count, 'templates of', len(qt_list), 'currently selected.')
+    return len(qt_list)
+
+
+def update_template_concepts(limit=None) -> int:
+    """ get action types from rdf data
+    """
+    schema = ctrl_flow_schema()
+    action_classes = get_class_descendants_rdf(
+        rdflib.URIRef(NS_code.get("action")), schema
+    )
+    # print("\taction_classes:", action_classes)
+
+    # templates_total = 0
+    done_count = 0
+
+    # qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
+    qt_list = dbmeta.findTemplatesOnStageDB(stage= None and dbmeta.STAGE_QT_SOLVED, limit=limit, version=dbmeta.TOOL_VERSION - 1)
+    if not qt_list:
+        return 0
+
+    # from full_questions import repair_statements_in_graph
+
+    ch = Checkpointer()
+
+    for qt in qt_list:
+
+        m = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE)
+
+        try:
+            concepts = [t for t in action_classes if (None, RDF.type, t) in m]
+            concepts = [NS_code.localize(t) for t in concepts]
+
+            # show concepts
+            print("\tconcepts:", concepts)
+        except AssertionError:
+            print(f'error with "{qt.name}"')
+            # raise
+            # mark the error
+            qt._stage = 10 + dbmeta.STAGE_QT_CREATED
+            qt.save()
+            continue
+
+        ### file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED, m)  ### , _debug_path_suffix='.v2'
+        new_bits = qt.concept_bits | dbmeta.names_to_bitmask(concepts)
+        if qt.concept_bits != new_bits:
+            qt.concept_bits |= new_bits
+        qt._version = dbmeta.TOOL_VERSION
+        qt.save()
+        done_count += 1
+        print('\t\tsaved.')
+        if done_count % 20 == 0:
+            ch.hit(        '   + 20 templates updated')
+            ch.since_start('[%3d] time elapsed so far:' % done_count)
+
+    ch.since_start("Updateing templates completed, in")
+    print("Updated", done_count, 'templates of', len(qt_list), 'currently selected.')
     return len(qt_list)
 
 
@@ -1553,7 +1612,9 @@ def automatic_pipeline(batch=700, offset=0):
     # if generate_questions_for_templates(limit=700) > 0:
     #     return
 
-    if generate_data_for_questions(offset=offset, limit=300) > 0:
+    if update_template_concepts(limit=None) > 0:
+
+    # if generate_data_for_questions(offset=offset, limit=300) > 0:
         return
 
 
