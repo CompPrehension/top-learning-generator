@@ -158,9 +158,10 @@ class Way(jsObj):
         common_k = k1 & k2
         for ck in common_k:
             if u1[ck].incompatible_with(u2[ck]):
-                print('incompatible_with way:')
-                print('\t1.:', u1)
-                print('\t2.:', u2)
+                print('\tincompatible ways found.')
+                # print('incompatible_with way:')
+                # print('\t1.:', u1)
+                # print('\t2.:', u2)
                 self.invalid = True
                 return None
 

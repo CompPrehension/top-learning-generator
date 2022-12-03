@@ -339,11 +339,16 @@ def fix_names_for_leaf_types(g, gl, quiet=False):
 
 #  2. Имена составных действий
 
-def shortname_for_type(type_name, **kw):
+def shortname_for_type(type_name, **kw) -> str or None:
     '''Нужно для независимых действий;  подчинённые действия не нуждаются в отбражаемом имени.
     kw: `id` или g, gl, node'''
     if 'g' in kw and  'gl' in kw and 'node' in kw:
         g, gl, node = kw['g'], kw['gl'], kw['node']
+
+        # if (node := kw.get('node')):
+        #     assert False, (node, [*g.subject_objects(gl(':global_code'),)])
+        #     if (None, gl(':global_code'), node) in g:
+        #         return None  # no change needed
     else:
         g = None
     prefix = None

@@ -591,8 +591,6 @@ def solve_templates(limit=None) -> int:
     if not qt_list:
         return 0
 
-    # from full_questions import repair_statements_in_graph
-
     ch = Checkpointer()
 
     for qt in qt_list:
@@ -963,7 +961,7 @@ def sigmoid(x):
         return z / (1 + z)
 
 
-CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop sequence return break continue".split()
+CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop return break continue".split()
 
 def question_metrics(g, gl, question_dict, quiet=False):
     data = {}
@@ -1047,7 +1045,7 @@ def question_metrics(g, gl, question_dict, quiet=False):
     complexity = learned_compexity
     x = (complexity - 2) * 5
     integral = sigmoid(x)
-    if not quiet: print('    Question complexity: %d  --> integral_complexity: %5f' % (complexity, integral))
+    if not quiet: print('    Question complexity: %f  --> integral_complexity: %5f' % (complexity, integral))
 
     return dict(
         solution_structural_complexity = round(complexity),
@@ -1066,8 +1064,10 @@ import threading
 import time
 CREATE_TRACES_TIMEOUT = 15  # seconds
 
+# CLAMP_COMPLEXITY = (0.1, 0.6)
+CLAMP_COMPLEXITY = (0.1, 0.8)
 
-def process_template(qt, questions_counter=0, clamp_complexity=(0.1, 0.6)):
+def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY):
     qtname = qt if isinstance(qt, str) else qt.name
 
     # g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
@@ -1113,7 +1113,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=(0.1, 0.6)):
         #                'TooEarlyInSequence'}),
         #     'rdf': <Graph>}]
 
-    print("Total questions generated: ", questions and len(questions))
+    print("Total questions generated: ", questions and len(questions) or 0)
 
     if not questions:
         return 0
@@ -1132,6 +1132,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=(0.1, 0.6)):
             complexity = metrics['integral_complexity']
             low, high = clamp_complexity
             if not (low <= complexity <= high):
+                print(f'-x- Cannot take this question: {low} <= {complexity} <= {high}')
                 continue
 
         suffix = question['name_suffix'] or ('_nocond_q%d' % questions_counter)
@@ -1176,7 +1177,8 @@ def generate_questions_for_templates(offset=None, limit=None):
     # else:
     #     sparql_limit = None
     # templates_to_create_questions = templatesWithoutQuestions(sparql_limit)
-    templates_to_create_questions = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_SOLVED, limit)
+    # templates_to_create_questions = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_SOLVED, limit)
+    templates_to_create_questions = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_USED, limit=None, version=None)
 
     ### debugging: get existing questions instead
     # templates_to_create_questions = list({n[:n.rfind("_v")] for n in unsolvedQuestions(GraphRole.QUESTION_SOLVED)})
@@ -1193,8 +1195,19 @@ def generate_questions_for_templates(offset=None, limit=None):
 
     ch = Checkpointer()
 
+    filter_by_concepts = 0
+    # filter_by_concepts = dbmeta.names_to_bitmask(['break', 'continue'])
+
     # for qtname in templates_to_create_questions[offset:limit]:
     for qt in templates_to_create_questions:
+
+        if qt._version >= dbmeta.TOOL_VERSION:
+            continue
+
+        if filter_by_concepts:
+            if not (qt.concept_bits & filter_by_concepts):
+                continue
+
         qtname = qt.name
 
         print()
@@ -1211,6 +1224,7 @@ def generate_questions_for_templates(offset=None, limit=None):
             templates_used += 1
             # set even if no questions made, to avoid trying it next time
             qt._stage = dbmeta.STAGE_QT_USED
+            qt._version = dbmeta.TOOL_VERSION
             qt.save()
             if questions_made > 0:
                 ch.hit(        '   + 1 template used')
@@ -1222,9 +1236,11 @@ def generate_questions_for_templates(offset=None, limit=None):
             print(e)
             print()
 
+        if questions_count > limit:  break
+
 
     print()
-    ch.since_start("Completed, in")
+    ch.since_start("Completed in")
     print(questions_count, 'questions created from', templates_used, 'templates.')
     print('done.')
     return questions_count
@@ -1606,16 +1622,17 @@ def automatic_pipeline(batch=700, offset=0):
     # if load_templates(limit=batch) > 20:  # note 14 errors
     #     return
 
+    # if update_template_concepts(limit=None) > 0:
+    #     return
+
     # if solve_templates(limit=None) > 0:
     #     return
 
-    # if generate_questions_for_templates(limit=700) > 0:
-    #     return
-
-    if update_template_concepts(limit=None) > 0:
+    if generate_questions_for_templates(limit=batch) > 0:
+        return
 
     # if generate_data_for_questions(offset=offset, limit=300) > 0:
-        return
+    #     return
 
 
     print('everything is done!')
@@ -1627,22 +1644,10 @@ def automatic_pipeline(batch=700, offset=0):
 
 if __name__ == '__main__':
     print('Initializing...')
-    # upload_templates(r'c:/Temp2/cf_v8-pre')
-    # upload_templates(r'c:/Temp2/cf_v8')
-    # upload_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=5200)
-
-    # find_templates(r'c:/Temp2/cf_v9-expr-concepts/__result', skip_first=0)
-    # find_templates(CONFIG.src_ttl_dir, skip_first=0)
 
     # automatic_pipeline(15)
     # automatic_pipeline(300, offset=0)
     automatic_pipeline()
-
-
-    # make_questions__main()
-
-    # generate_data_for_questions(0, None)
-
 
     # add_concepts_from_list()
     # make_questions_sample(size=200)

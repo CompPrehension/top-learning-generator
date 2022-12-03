@@ -5,7 +5,7 @@ from db_utils.sqlite_orm_classes import *
 
 
 # write to `_version` column to track data generated with older scripts
-TOOL_VERSION = 3
+TOOL_VERSION = 4
 
 # some enum-like constants
 STAGE_QT_FOUND = 0
