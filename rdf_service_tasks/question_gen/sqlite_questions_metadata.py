@@ -5,7 +5,7 @@ from db_utils.sqlite_orm_classes import *
 
 
 # write to `_version` column to track data generated with older scripts
-TOOL_VERSION = 4
+TOOL_VERSION = 5
 
 # some enum-like constants
 STAGE_QT_FOUND = 0
@@ -20,8 +20,8 @@ STAGE_Q_DATA_SAVED = 3
 
 
 def findQuestionOrTemplateByNameDB(name):
-    obj = (Questions.get(Questions.name == names)
-        or Templates.get(Templates.name == names));
+    obj = (Questions.get_or_none(Questions.name == name)
+        or Templates.get_or_none(Templates.name == name));
     if not obj:
         print("    (DB: No question or template found for name: %s)" % name)
     return obj

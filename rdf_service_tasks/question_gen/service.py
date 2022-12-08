@@ -728,7 +728,7 @@ def update_template_concepts(limit=None) -> int:
             ch.hit(        '   + 20 templates updated')
             ch.since_start('[%3d] time elapsed so far:' % done_count)
 
-    ch.since_start("Updateing templates completed, in")
+    ch.since_start("Updating templates completed, in")
     print("Updated", done_count, 'templates of', len(qt_list), 'currently selected.')
     return len(qt_list)
 
@@ -1060,12 +1060,15 @@ def question_metrics(g, gl, question_dict, quiet=False):
         **data
     )
 
+
 import threading
 import time
 CREATE_TRACES_TIMEOUT = 15  # seconds
 
 # CLAMP_COMPLEXITY = (0.1, 0.6)
-CLAMP_COMPLEXITY = (0.1, 0.8)
+# CLAMP_COMPLEXITY = (0.1, 0.8)
+CLAMP_COMPLEXITY = (0.5, 1.0)
+MAX_ACTIONS_COUNT = 20
 
 def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY):
     qtname = qt if isinstance(qt, str) else qt.name
@@ -1129,6 +1132,18 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
         print()
         metrics = question_metrics(g, gl, question)
         if clamp_complexity:
+            ### !!! Get only ones with 'true' values !!! ###
+            name_suffix = question['name_suffix']
+            if '1' not in name_suffix:
+                print(f'-x- Skip this question: name_suffix = {name_suffix} has no "true"')
+                continue
+            print(f"    name_suffix = {name_suffix}")
+
+            actions_count = metrics['actions_count']
+            if actions_count > MAX_ACTIONS_COUNT:
+                print(f'-x- Cannot take this question: actions_count = {actions_count} <= {MAX_ACTIONS_COUNT}')
+                continue
+
             complexity = metrics['integral_complexity']
             low, high = clamp_complexity
             if not (low <= complexity <= high):
@@ -1622,7 +1637,7 @@ def automatic_pipeline(batch=700, offset=0):
     # if load_templates(limit=batch) > 20:  # note 14 errors
     #     return
 
-    # if update_template_concepts(limit=None) > 0:
+    # if update_template_concepts(limit=batch) > 0:
     #     return
 
     # if solve_templates(limit=None) > 0:

@@ -1,5 +1,6 @@
 # sqlite2mysql.py
 
+from urllib.parse import quote_plus  # https://stackoverflow.com/a/1424009/12824563
 
 import sqlite_orm_classes as lt
 
@@ -9,7 +10,12 @@ from sqlalchemy import create_engine
 # df = pd.read_sql('SELECT * FROM <table_name>', cnx) #read the entire table
 
 # connection_str = ''
-# local
+if 1:
+	# local
+	print("sending data to local connection")
+else:
+	# remote
+	print("sending data to remote connection ...")
 cnx = create_engine(connection_str)
 
 
