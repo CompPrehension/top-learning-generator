@@ -1,6 +1,7 @@
 from peewee import *
 
-database = SqliteDatabase('c:/data/compp/control_flow_work.sqlite3')
+# database = SqliteDatabase('c:/data/compp/control_flow_work.sqlite3')
+database = SqliteDatabase('c:/data/compp/expression_work.sqlite3')
 
 class UnknownField(object):
     def __init__(self, *_, **__): pass
@@ -63,6 +64,7 @@ class Questions(BaseModel):
     solution_structural_complexity = FloatField(null=True)
     tag_bits = IntegerField(null=True)
     template = ForeignKeyField(column_name='template_id', field='id', model=Templates)
+    trace_concept_bits = IntegerField(constraints=[SQL("DEFAULT 0")], null=True)
     violation_bits = IntegerField(null=True)
 
     class Meta:

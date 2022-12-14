@@ -6,8 +6,15 @@ import sqlite_orm_classes as lt
 
 from sqlalchemy import create_engine
 
+if __name__ != '__main__':
+	exit(5)  # guard: fail if someone tries to import this module to another
+
 # cnx = create_engine('mysql+pymysql://<username>:<password>@<host>/<dbname>')
 # df = pd.read_sql('SELECT * FROM <table_name>', cnx) #read the entire table
+
+IGNORE_IDS = True
+# TARGET_DOMAIN = 'ctrl_flow'
+TARGET_DOMAIN = 'expression'
 
 # connection_str = ''
 if 1:
@@ -37,7 +44,7 @@ session = Session()
 
 # SQLite section >
 
-TARGET_LOWEST_VERSION = 4  # see lt.TOOL_VERSION
+TARGET_LOWEST_VERSION = 6  # see lt.TOOL_VERSION
 
 q_list = list(lt.Questions.select().where((lt.Questions._stage == 3) & (lt.Questions._version >= TARGET_LOWEST_VERSION)).execute())
 
@@ -56,10 +63,16 @@ succeeded = 0
 
 # q_list[0].__data__
 for _i, q in enumerate(q_list):
-    fields = q.__data__
+    fields = dict(q.__data__)
+    fields['domain_shortname'] = TARGET_DOMAIN
+    fields['q_graph'] = None
     fields['template_id'] = fields['template']
-    # del fields['id']  # catch error on duplicate
     del fields['template']
+    # round long floats
+    fields['solution_structural_complexity'] = round(fields['solution_structural_complexity'], 5)
+    fields['integral_complexity'] = round(fields['integral_complexity'], 5)
+    if IGNORE_IDS:
+	    del fields['id']  # catch error on duplicate
     # insert
     i = insert(ctfl_questions_table)
     i = i.values(fields)
@@ -79,6 +92,6 @@ for _i, q in enumerate(q_list):
 print(_i + 1, 'completed,')
 print(succeeded, 'successfully.')
 
-session.commit()  # without this run Workbench crashed :) on `select count(*)`, and shown no rows on `select *`
+session.commit()  # without this run, Workbench crashed :) on `select count(*)`, and shown no rows on `select *`
 
 print(time() - time_begin, 's elapsed total.')

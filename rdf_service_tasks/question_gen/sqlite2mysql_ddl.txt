@@ -14,6 +14,7 @@ CREATE TABLE questions (
     concept_bits                   INTEGER,
     law_bits                       INTEGER,
     violation_bits                 INTEGER,
+    trace_concept_bits             INTEGER,
     solution_structural_complexity REAL,
     integral_complexity            REAL,
     solution_steps                 INTEGER,
@@ -25,22 +26,25 @@ CREATE TABLE questions (
  ====>
 
 # to MySQL
+DROP TABLE IF EXISTS questions_meta ;
 CREATE TABLE questions_meta (
-    id                             INTEGER  NOT NULL AUTO_INCREMENT,
+    id                             INT  NOT NULL AUTO_INCREMENT,
     name                           TEXT,
     domain_shortname               VARCHAR(45) NOT NULL DEFAULT "ctrl_flow",  # added
-    template_id                    INTEGER NOT NULL,
+    template_id                    INT NOT NULL,
     q_graph                        TEXT,
     q_data_graph                   TEXT,
-    tag_bits                       INTEGER,
-    concept_bits                   INTEGER,
-    law_bits                       INTEGER,
-    violation_bits                 INTEGER,
+    tag_bits                       BIGINT,
+    concept_bits                   BIGINT,
+    law_bits                       BIGINT,
+    violation_bits                 BIGINT,
+    trace_concept_bits             BIGINT,
     solution_structural_complexity REAL,
     integral_complexity            REAL,
-    solution_steps                 INTEGER,
-    distinct_errors_count          INTEGER,
-    _stage                         INTEGER,
-    _version                       INTEGER,
-  PRIMARY KEY (`id`)
+    solution_steps                 INT,
+    distinct_errors_count          INT,
+    _stage                         INT,
+    _version                       INT,
+  PRIMARY KEY (`id`),
+  KEY `idx_questions_meta_domain_shortname` (`domain_shortname`) COMMENT 'probably faster search among different domains'
 );
