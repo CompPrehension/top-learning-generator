@@ -1,6 +1,11 @@
 #pragma once
+
 #include <string>
 #include <clang/Basic/SourceLocation.h>
+#include <clang/Basic/SourceManager.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/AST/NestedNameSpecifier.h>
+#include <clang/Lex/Lexer.h>
 #include <string>
 #include <sstream>
 #include <regex>

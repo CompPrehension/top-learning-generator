@@ -14,6 +14,7 @@
 #include <ctime>
 #include "json.hpp"
 
+using namespace clang;
 using namespace clang::tooling;
 using namespace clang::ast_matchers;
 using namespace llvm;
@@ -53,7 +54,7 @@ public:
 private:
     void runForExpressionDomain(const clang::Expr* node, const MatchFinder::MatchResult& Result) {
         ExpressionDomainNode* dstNode = NULL;
-        __try {
+        try {
             auto rawExpr = get_source_text_raw_tr(node->getSourceRange(), *Result.SourceManager);
             dstNode = mapToDst(node, Result.SourceManager);
 
@@ -97,11 +98,11 @@ private:
             file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
 
             file << rdfString << "\n";
+        } catch (...) {
+
         }
-        __finally {
-            if (dstNode)
-                delete dstNode;
-        }
+        if (dstNode)
+            delete dstNode;
     }
 
     void runForCntrlFlowDomain(const clang::FunctionDecl* node, const MatchFinder::MatchResult& Result) {

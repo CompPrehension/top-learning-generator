@@ -41,7 +41,7 @@ public:
 
 	static void saveAndClear(string outputFilename)
 	{
-		__try 
+		try 
 		{
 			std::ofstream fs(outputFilename);
 
@@ -52,10 +52,10 @@ public:
 				fs << ent.message << "\n";
 			}
 		} 
-		__finally 
+		catch (...) 
 		{
-			Logger::buffer.clear();
-		}
+        }
+		Logger::buffer.clear();
 	}
 
 	static void clear()
