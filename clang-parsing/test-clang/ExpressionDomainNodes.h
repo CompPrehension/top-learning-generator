@@ -35,12 +35,12 @@ public:
 	{
 	}
 
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Undefined" << "\n";
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		return "<Undefinend node>";
 	}
@@ -66,7 +66,7 @@ public:
 	string& getType() { return this->type; }
 	ExpressionDomainNode* getLeftChild() { return this->leftChild; }
 	ExpressionDomainNode* getRightChild() { return this->rightChild; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "BinaryOperator" << " " << this->type << " " << "\n";
 		if (this->leftChild)
@@ -75,7 +75,7 @@ public:
 			this->rightChild->dump(level + 1);
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto leftPart = this->leftChild ? this->leftChild->toString() : "<undefined>";
 		auto rightPart = this->rightChild ? this->rightChild->toString() : "<undefined>";
@@ -104,14 +104,14 @@ public:
 
 	string& getType() { return this->type; }
 	ExpressionDomainNode* getChild() { return this->child; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "UnaryOperator" << " " << this->type << " " << "\n";
 		if (this->child)
 			this->child->dump(level + 1);
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto isPostfix = ((clang::UnaryOperator*)this->getAstNode())->isPostfix();
 		return isPostfix ? this->child->toString() + this->type : this->type + this->child->toString();
@@ -143,7 +143,7 @@ public:
 	}
 
 	ExpressionDomainNode* getInit() { return this->init; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Var" << " " << this->name << " with initial value:" << "\n";
 		if (this->init)
@@ -158,7 +158,7 @@ public:
 		return this->name;
 	}
 
-	string toString()
+	virtual string toString()
 	{		
 		return this->name;
 	}
@@ -202,7 +202,7 @@ public:
 		: ExpressionDomainNode(astNode), name(name), args(args)
 	{
 	}
-	~ExpressionDomainFuncCallNode()
+	virtual ~ExpressionDomainFuncCallNode()
 	{
 		for (auto* arg : this->args)
 		{
@@ -211,7 +211,7 @@ public:
 		}
 	}
 	
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "FuncCall" << " " << this->name << " with args value:" << "\n";
 		for (auto* arg : this->args)
@@ -221,7 +221,7 @@ public:
 		}
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		string argsString;
 		for (auto* arg : this->args)
@@ -262,12 +262,12 @@ public:
 	}
 
 	string& getValue() { return this->value; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Const" << " " << this->value << " " << "\n";
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		return this->value;
 	}
@@ -284,7 +284,7 @@ public:
 		: ExpressionDomainNode(astNode), expr(expr)
 	{
 	}
-	~ExpressionDomainParenExprNode() 
+	virtual ~ExpressionDomainParenExprNode() 
 	{
 		if (expr)
 			delete expr;
@@ -292,14 +292,14 @@ public:
 
 	ExpressionDomainNode* getExpr() { return this->expr; }
 
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "ParenExpr " << "\n";
 		if (this->expr)
 			this->expr->dump(level + 1);
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto exprS = this->expr->toString();
 		return "(" + exprS + ")";
@@ -316,14 +316,14 @@ public:
 		: ExpressionDomainNode(astNode), leftValue(leftValue), rightValue(rightValue)
 	{
 	}
-	~ExpressionDomainMemberExprNode()
+	virtual ~ExpressionDomainMemberExprNode()
 	{
 		if (leftValue)
 			delete leftValue;
 	}
 
 	//string& getValue() { return this->value; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Member expr from " << "\n";
 		if (this->leftValue)
@@ -341,7 +341,7 @@ public:
 		return this->rightValue;
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto leftPart = leftValue->toString();
 		auto op = this->isArrow() ? "->" : ".";
@@ -367,7 +367,7 @@ public:
 		: ExpressionDomainNode(astNode), arrayExpr(arrayExpr), indexExpr(indexExpr)
 	{
 	}
-	~ExpressionDomainArrayBracketNode()
+	virtual ~ExpressionDomainArrayBracketNode()
 	{
 		if (arrayExpr)
 			delete arrayExpr;
@@ -376,7 +376,7 @@ public:
 	}
 
 	//string& getValue() { return this->value; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "Array brackets for " << "\n";
 		if (this->arrayExpr)
@@ -386,7 +386,7 @@ public:
 			this->indexExpr->dump(level + 1);
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto leftPart = this->arrayExpr->toString();
 		auto rightPart = this->indexExpr->toString();
@@ -408,7 +408,7 @@ public:
 		: ExpressionDomainNode(astNode), expr(expr), left(left), right(right)
 	{
 	}
-	~ExpressionDomainConditionalOperatorNode()
+	virtual ~ExpressionDomainConditionalOperatorNode()
 	{
 		if (expr)
 			delete expr;
@@ -419,7 +419,7 @@ public:
 	}
 
 	//string& getValue() { return this->value; }
-	void dump(int level = 0)
+	virtual void dump(int level = 0)
 	{
 		llvm::outs() << string(level, ' ') << "ternary operator " << "\n";
 		if (this->expr)
@@ -432,7 +432,7 @@ public:
 			this->right->dump(level + 1);
 	}
 
-	string toString()
+	virtual string toString()
 	{
 		auto exprS = this->expr->toString();
 		auto leftS = this->left ? this->left->toString() : "";

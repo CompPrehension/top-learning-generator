@@ -73,8 +73,8 @@ private:
 
             // if file with this name already exists - skip this function
             string outputDir = GlobalOutputPath;
-            if (!outputDir.empty() && outputDir.back() != '\\')
-                outputDir += '\\';
+            if (!outputDir.empty() && outputDir.back() != '\\' && outputDir.back() != '/')
+                outputDir += '/';
             if (fileExists(outputDir, fileNamePart))
             {
                 return;
@@ -98,8 +98,11 @@ private:
             file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
 
             file << rdfString << "\n";
-        } catch (...) {
-
+        } catch (const std::bad_cast &badCastEx) {
+            std::cerr << badCastEx.what();
+		} catch (...) {
+			cout << "Unexpected error found" << endl;
+			Logger::error("Unexpected error found");
         }
         if (dstNode)
             delete dstNode;
@@ -171,8 +174,10 @@ private:
             Logger::info("RDF Successfully saved to file");
             isSuccess = true;
         } catch (string& err) {
+			cout << "error: " << err << endl;
             Logger::error(err);
         } catch (...) {
+			cout << "Unexpected error found"<< endl;
             Logger::error("Unexpected error found");
         }
 
@@ -197,8 +202,11 @@ private:
 int main(int argc, const char** argv) {
 
     GlobalOutputPath = string(argv[argc - 1]);
-    if (!std::filesystem::exists(GlobalOutputPath))
-        throw new string("The last arg should be valid output folder path");
+    if (!std::filesystem::exists(GlobalOutputPath)) {
+		cout << "The last arg should be valid output folder path" << endl;
+        return -1;
+	}
+	cout << "outputPath set to " << GlobalOutputPath<< endl;
 
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
     if (!ExpectedParser) {

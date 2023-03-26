@@ -207,7 +207,7 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 	}
 	if (auto node = dynamic_cast<ControlFlowDomainIfStmtNode*>(stmt))
 	{
-		auto ifParts = node->getIfParts();
+		auto &ifParts = node->getIfParts();
 		for (int i = 0; i < ifParts.size(); ++i)
 		{
 			if (i == 0)
@@ -444,7 +444,7 @@ ControlFlowDomainLinkedRdfNode* mapToRdfNode(ControlFlowDomainStmtNode* node, in
 	{
 		vector<ControlFlowDomainAlternativeBranchRdfNode*> alternatives;
 		ControlFlowDomainAlternativeBranchRdfNode* prevBranchNode = NULL;
-		auto ifParts = castedNode->getIfParts();
+		auto &ifParts = castedNode->getIfParts();
 		int i = 0;
 		for (i = 0; i < ifParts.size(); ++i)
 		{

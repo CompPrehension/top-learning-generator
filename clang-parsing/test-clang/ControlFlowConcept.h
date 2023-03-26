@@ -16,8 +16,8 @@ struct ControlFlowConceptHash
     }
 };
 
-inline string toRdfString(ControlFlowConcept concept) {
-    switch (concept) {
+inline string toRdfString(ControlFlowConcept cfConcept) {
+    switch (cfConcept) {
         case ControlFlowConcept::Array:
             return "expr:array";
         case ControlFlowConcept::Pointer:
@@ -29,5 +29,5 @@ inline string toRdfString(ControlFlowConcept concept) {
         case ControlFlowConcept::ExplicitCast:
             return "expr:explicit_cast";
     }
-    return concept._to_string();
+    return cfConcept._to_string();
 }

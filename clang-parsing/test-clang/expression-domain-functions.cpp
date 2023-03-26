@@ -157,14 +157,7 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     }
     if (auto membExpr = dyn_cast<clang::MemberExpr>(node))
     {
-        
         auto right = membExpr->getMemberDecl()->getNameAsString();
-        if (right._Starts_with("ipv4"))
-        {
-            int x = 0;
-            membExpr->dump();
-        }
-
         Expr* leftAstNode;
         do {
             leftAstNode = membExpr->getBase();

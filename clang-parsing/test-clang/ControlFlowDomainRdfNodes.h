@@ -115,7 +115,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -171,7 +171,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;		
 
 		ss << "\n";
@@ -181,8 +181,8 @@ public:
 		{
 			ss << string(attributesOffest, ' ') << ":has_concept ";
 			int i = 0;
-			for (auto concept : concepts) {
-				ss << "\"" << toRdfString(concept) << "\""; 
+			for (auto &cfConcept : concepts) {
+				ss << "\"" << toRdfString(cfConcept) << "\""; 
 				if (i != concepts.size() - 1)
 					ss << ",";
 				i++;
@@ -215,7 +215,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -247,7 +247,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -321,7 +321,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -365,7 +365,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -413,7 +413,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -537,7 +537,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -652,7 +652,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
@@ -715,7 +715,7 @@ public:
 
 	virtual void toString(stringstream& ss)
 	{
-		auto nodeRef = this->getNodeRef();
+		auto &nodeRef = this->getNodeRef();
 		auto attributesOffest = nodeRef.size() + 1;
 
 		ss << "\n";
