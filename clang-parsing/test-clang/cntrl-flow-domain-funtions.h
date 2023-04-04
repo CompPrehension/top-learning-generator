@@ -5,7 +5,7 @@
 #include "ControlFlowDomainNodes.h"
 #include "ControlFlowDomainRdfNodes.h"
 #include "helpers.h"
-#include "logger.h"
+#include "Logger.h"
 
 using namespace std;
 

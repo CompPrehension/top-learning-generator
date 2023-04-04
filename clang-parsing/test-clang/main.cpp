@@ -32,12 +32,16 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...\n");
 
-static string GlobalOutputPath = "";
-
-
 class ExprPrinter : public MatchFinder::MatchCallback {
+private:
+    string outputDir;
+
 public:
-    virtual void run(const MatchFinder::MatchResult& Result) {
+    ExprPrinter(string outputDir) : outputDir(outputDir) {
+    }
+
+
+    virtual void run(const MatchFinder::MatchResult& Result) {		
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
             runForExpressionDomain(node, Result);
@@ -62,17 +66,16 @@ private:
                 return;
 
             auto normalizedExpressionStr = dstNode->toString();
+            cout << normalizedExpressionStr << endl;
             auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
             auto rdfString = rdfTreeToString(rdfTree);
-            // std::cout << normalizedExpressionStr << "\n";\
 
             auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
             auto time = std::time(0);
             auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
-            // if file with this name already exists - skip this function
-            string outputDir = GlobalOutputPath;
+            // if file with this name already exists - skip this function            
             if (!outputDir.empty() && outputDir.back() != '\\' && outputDir.back() != '/')
                 outputDir += '/';
             if (fileExists(outputDir, fileNamePart))
@@ -113,7 +116,6 @@ private:
         ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
         string functionName;
         string shortFilename = "";
-        string outputDir = GlobalOutputPath;
         string logsDir = outputDir;
         bool isSuccess = false;
 
@@ -139,6 +141,7 @@ private:
             Logger::info(originalCode);
 
             auto normalizedCode = toCustomCppString(dstNode, *Result.SourceManager, *Result.Context, true);
+			
             Logger::info("Normalized code:");
             Logger::info(normalizedCode);
 
@@ -200,13 +203,21 @@ private:
 
 
 int main(int argc, const char** argv) {
+    std::cout << typeid(int).name() << std::endl;
 
-    GlobalOutputPath = string(argv[argc - 1]);
-    if (!std::filesystem::exists(GlobalOutputPath)) {
+    auto domainName = string(argv[argc - 2]);    
+    if (domainName != "expression" && domainName != "control_flow") {
+        cout << "Invalid domain name - expected 'expression' or 'control_flow'" << endl;
+        return -1;
+    }
+    cout << "domain = " << domainName << endl;
+
+    auto outputDir = string(argv[argc - 1]);
+    if (!std::filesystem::exists(outputDir)) {
 		cout << "The last arg should be valid output folder path" << endl;
         return -1;
 	}
-	cout << "outputPath set to " << GlobalOutputPath<< endl;
+    cout << "outputPath = " << outputDir << endl;
 
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
     if (!ExpectedParser) {
@@ -214,38 +225,34 @@ int main(int argc, const char** argv) {
         llvm::errs() << ExpectedParser.takeError();
         return 1;
     }
-    
 
     CommonOptionsParser& OptionsParser = ExpectedParser.get();
     ClangTool Tool(OptionsParser.getCompilations(),
         OptionsParser.getSourcePathList());
-
-    /*
-    auto exressionDomainMatcher = expr(
-        anyOf(
-            binaryOperator(hasOperatorName("&&")),
-            binaryOperator(hasOperatorName("||")),
-            unaryOperator(hasOperatorName("!")),
-            binaryOperator(hasOperatorName("+")),
-            binaryOperator(hasOperatorName("-")),
-            binaryOperator(hasOperatorName("*")),
-            binaryOperator(hasOperatorName("/")),
-            unaryOperator(hasOperatorName("-")),
-            unaryOperator(hasOperatorName("++")),
-            unaryOperator(hasOperatorName("--")),
-            binaryOperator(isAssignmentOperator()),
-            binaryOperator(isComparisonOperator()),
-            cxxMemberCallExpr()
-        )
-    ).bind("exressionDomain");
-    */
-    auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt()))
-        .bind("cntrlflowDomain");
-
-    ExprPrinter Printer;
+    ExprPrinter Printer(outputDir);
     MatchFinder Finder;
-    //Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+
+    if (domainName == "expression") {
+        auto exressionDomainMatcher =
+            expr(anyOf(binaryOperator(hasOperatorName("&&")),
+                       binaryOperator(hasOperatorName("||")),
+                       unaryOperator(hasOperatorName("!")),
+                       binaryOperator(hasOperatorName("+")),
+                       binaryOperator(hasOperatorName("-")),
+                       binaryOperator(hasOperatorName("*")),
+                       binaryOperator(hasOperatorName("/")),
+                       unaryOperator(hasOperatorName("-")),
+                       unaryOperator(hasOperatorName("++")),
+                       unaryOperator(hasOperatorName("--")),
+                       binaryOperator(isAssignmentOperator()),
+                       binaryOperator(isComparisonOperator()),
+                       cxxMemberCallExpr()))
+                .bind("exressionDomain");
+        Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
+    } else {
+        auto cntrlflowDomainMatcher = functionDecl(hasBody(compoundStmt())).bind("cntrlflowDomain");
+        Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, cntrlflowDomainMatcher), &Printer);
+    }    
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
 }
