@@ -750,15 +750,22 @@ def update_template_concepts(limit=None) -> int:
 
     for qt in qt_list:
 
-        m = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE)
+        # m = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE)
+        m = getQuestionModelDB(qt, GraphRole.QUESTION_TEMPLATE_SOLVED)
 
         try:
-            concepts = [t for t in action_classes if (None, RDF.type, t) in m]
-            concepts = [NS_code.localize(t) for t in concepts]
+            # concepts = [t for t in action_classes if (None, RDF.type, t) in m]
+            # concepts = [NS_code.localize(t) for t in concepts]
+            # concepts.remove('stmt')  # TODO: verify line
+
+            concepts = []  # ??
+            some_metrics = play_extracting_concepts(m)
+            if some_metrics['max_loop_nesting_depth'] >= 2:
+                concepts.append('nested_loop')  # note the name introduced here
 
             # show concepts
             print("\tconcepts:", concepts)
-        except AssertionError:
+        except AssertionError as e:
             print(f'error with "{qt.name}"')
             # raise
             # mark the error
@@ -770,8 +777,22 @@ def update_template_concepts(limit=None) -> int:
         new_bits = qt.concept_bits | dbmeta.names_to_bitmask(concepts)
         if qt.concept_bits != new_bits:
             qt.concept_bits |= new_bits
+        if some_metrics:
+            for k, v in some_metrics.items():
+                if getattr(qt, k) != v:
+                    setattr(qt, k, v)
         qt._version = dbmeta.TOOL_VERSION
         qt.save()
+        if 'update questions as well':
+            query = dbmeta.Questions.select()
+            query = query.where(dbmeta.Questions.template_id == qt.id)
+            iterator = query.execute()
+            for q in iterator:
+                new_bits = q.concept_bits | new_bits
+                if q.concept_bits != new_bits:
+                    q.concept_bits |= new_bits
+                    q.save()
+
         done_count += 1
         print('\t\tsaved.')
         if done_count % 20 == 0:
@@ -1048,16 +1069,17 @@ def question_metrics(g, gl, question_dict, quiet=False):
     max_depth = action_depth(root) - 1
     data['nesting_depth'] = max_depth
 
+    # find max loop nesting depth (1 = 1 loop, 1 = 2 loops, one in other)
 
-    # find max loop nesting depth by counting parent loops looking up from bottom
-    query = 'SELECT ?s where {?s a :loop}'
-    r = g.query(query, initNs=PREFIXES)
-    loops = [next(iter(b.values())) for b in r.bindings]
+    # query = 'SELECT ?s where {?s a :loop}'
+    # r = g.query(query, initNs=PREFIXES)
+    # loops = [next(iter(b.values())) for b in r.bindings]
+    loops = list(g.subjects(RDF.type, gl(':loop')))
     if not loops:
         data['max_loop_nesting_depth'] = 0
     else:
-        # find reverse nesting: how many loops a loop is nested in?
-        in_loop__ppath = ~ppath * '+'
+        # count how many loops are in each loop ...
+        in_loop__ppath = gl(':hasPartTransitive') | (ppath | gl(':body')) * '+';
         nest_depths = [
             sum((L, in_loop__ppath, L2) in g for L2 in loops if L2 is not L)
             for L in loops
@@ -1650,6 +1672,158 @@ def generate_data_for_questions(offset=None, limit=None):
     return questions_count
 
 
+def update_questions_trace_concepts(limit=None):
+    print("Requesting not updated questions ...", flush=True)
+
+    # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
+    # questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_CREATED, limit)
+    questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_DATA_SAVED)  # , limit, dbmeta.TOOL_VERSION - 1)
+
+    # # custom filter
+    # questions_to_process = [q for q in questions_to_process if q.trace_concept_bits == 0]
+    questions_to_process = [q for q in questions_to_process if q._version < dbmeta.TOOL_VERSION]
+
+    print('Questions not-updated found: %d' % len(questions_to_process))
+
+    schema = ctrl_flow_schema()
+    gl = graph_lookup(schema, PREFIXES)
+    ppath = (gl(':executes') / gl(':boundary_of') / RDF.type)
+
+    # action_classes = get_class_descendants_rdf(
+    #     rdflib.URIRef(NS_code.get("action")), schema
+    # )
+    # print("\taction_classes:", action_classes)
+
+    questions_count = 0
+    skip_count = 0
+
+    for q in questions_to_process[-limit:]:
+        qname = q.name
+        print()
+        print("Updating question: ", qname, "(i: %d)" % (questions_count + skip_count))
+        try:
+            g = getQuestionModelDB(q, GraphRole.QUESTION)
+            executed_actions = set(extract_graph_values(g, None, ppath))
+            # print(executed_actions)
+            trace_action_classes = sorted(filter(None,
+                                                 ((NS_code.localize(uri) or '') for uri in executed_actions)
+                                                 ))
+            trace_action_classes = [t for t in trace_action_classes if t in CONCEPT_CANDIDATES]
+
+            print(trace_action_classes, end=' ==> ')
+            bitmask = dbmeta.names_to_bitmask(trace_action_classes)
+            print(bitmask)
+            q.trace_concept_bits = bitmask
+            q._version = dbmeta.TOOL_VERSION
+            q.save()
+
+            questions_count += 1
+            # skip_count += not n
+        except (NotImplementedError, AssertionError) as e:
+            skip_count += 1
+            print()
+            print('Error with question: ', qname)
+            print(e)
+            q._stage = dbmeta.STAGE_Q_DATA_SAVED + 10  # mark the error
+            q.save()
+            print()
+
+    print()
+    print(questions_count, 'questions updated with data.')
+    print(skip_count, 'questions with errors.')
+    print('done.')
+    return questions_count
+
+
+def update_questions_trace_features(limit=None):
+    print("Requesting not updated questions ...", flush=True)
+
+    # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
+    # questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_CREATED, limit)
+    questions_to_process = dbmeta.findQuestionsOnStageDB(dbmeta.STAGE_Q_DATA_SAVED)  # , limit, dbmeta.TOOL_VERSION - 1)
+
+    # # custom filter
+    # questions_to_process = [q for q in questions_to_process if q.trace_concept_bits == 0]
+    questions_to_process = [q for q in questions_to_process if q._version < dbmeta.TOOL_VERSION]
+
+    total = len(questions_to_process)
+    print('Questions not-updated found: %d' % total)
+
+    schema = ctrl_flow_schema()
+    gl = graph_lookup(schema, PREFIXES)
+    ppath = (gl(':executes') / gl(':boundary_of') / RDF.type)
+
+    # action_classes = get_class_descendants_rdf(
+    #     rdflib.URIRef(NS_code.get("action")), schema
+    # )
+    # print("\taction_classes:", action_classes)
+
+    questions_count = 0
+    skip_count = 0
+
+    qt_feature_columns = "structural_complexity actions_count cyclomatic max_if_branches nesting_depth max_loop_nesting_depth".split()
+
+    for q in questions_to_process[:limit:]:
+        qname = q.name
+        print()
+        print("Updating question: ", qname, "(i: %d)" % (questions_count + skip_count))
+        try:
+            ###
+            qf_str = q.trace_features_json
+            if '"max_if_branches_entered": 0' in qf_str:
+                q._version = dbmeta.TOOL_VERSION
+                q.save()
+                questions_count += 1
+                continue
+
+            trace_features_json = {'flags': {}, 'numeric': {}}
+
+            qt = q.template
+
+            # get useful data from qt
+            for key in qt_feature_columns:
+                trace_features_json['numeric'][key] = getattr(qt, key) or 0
+
+            g = getQuestionModelDB(q, GraphRole.QUESTION)
+
+            data = question_trace_features(g, gl, q, quiet=False)
+
+            # if data.more_concepts:
+            #     bitmask = dbmeta.names_to_bitmask(data.more_concepts)
+            #     # print(bitmask)
+            #     q.concept_bits |= bitmask
+            #     q.trace_concept_bits |= bitmask
+            #     del data['more_concepts']
+
+            trace_features_json['flags'] |= data.flags
+            trace_features_json['numeric'] |= data.numeric
+            ### print(trace_features_json)
+
+            q.trace_features_json = json.dumps(trace_features_json)
+
+            ###
+            q._version = dbmeta.TOOL_VERSION
+            q.save()
+
+            questions_count += 1
+            # skip_count += not n
+            if questions_count % 20 == 0:
+                print('   ... total unprocessed: ', total)
+        except (NotImplementedError, AssertionError) as e:
+            skip_count += 1
+            print()
+            print('Error with question: ', qname)
+            print(e)
+            q._stage = dbmeta.STAGE_Q_DATA_SAVED + 10  # mark the error
+            q.save()
+            print()
+
+    print()
+    print(questions_count, 'questions updated with data.')
+    print(skip_count, 'questions with errors.')
+    print('done.')
+    return questions_count
+
 
 def make_questions__main():
     if 1:
@@ -1945,7 +2119,12 @@ def automatic_pipeline(batch=700, offset=0):
     # if solve_templates(limit=None) > 0:
     #     return
 
-    if generate_questions_for_templates(limit=batch) > 0:
+    # if generate_questions_for_templates(limit=batch) > 0:
+    #     return
+
+    # if update_questions_trace_concepts(limit=700) > 0:
+    #     return
+    if update_questions_trace_features(limit=6000) > 0:
         return
 
     # if generate_data_for_questions(offset=offset, limit=300) > 0:

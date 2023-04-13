@@ -19,8 +19,28 @@ CREATE TABLE questions (
     integral_complexity            REAL,
     solution_steps                 INTEGER,
     distinct_errors_count          INTEGER,
+    trace_features_json            TEXT    DEFAULT ('{}'),
     _stage                         INTEGER,
     _version                       INTEGER
+);
+
+CREATE TABLE templates (
+    id                     INTEGER PRIMARY KEY ASC AUTOINCREMENT
+                                   NOT NULL
+                                   DEFAULT (0),
+    name                   TEXT,
+    src_path               TEXT,
+    qt_graph               TEXT,
+    qt_s_graph             TEXT,
+    concept_bits           INTEGER,
+    structural_complexity  REAL,
+    actions_count          INTEGER,
+    cyclomatic             INTEGER,
+    max_if_branches        INTEGER,
+    nesting_depth          INTEGER,
+    max_loop_nesting_depth INTEGER,
+    _stage                 INTEGER,
+    _version               INTEGER
 );
 
  ====>
@@ -38,11 +58,13 @@ CREATE TABLE questions_meta (
     concept_bits                   BIGINT,
     law_bits                       BIGINT,
     violation_bits                 BIGINT,
-    trace_concept_bits             BIGINT,
+    trace_concept_bits             BIGINT DEFAULT 0,
+    trace_feature_bits             BIGINT DEFAULT 0,
     solution_structural_complexity REAL,
     integral_complexity            REAL,
     solution_steps                 INT,
     distinct_errors_count          INT,
+    trace_features_json            TEXT    DEFAULT ('{}'),
     _stage                         INT,
     _version                       INT,
   PRIMARY KEY (`id`),
