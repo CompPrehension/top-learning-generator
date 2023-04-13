@@ -158,11 +158,7 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     if (auto membExpr = dyn_cast<clang::MemberExpr>(node))
     {
         auto right = membExpr->getMemberDecl()->getNameAsString();
-        Expr* leftAstNode;
-        do {
-            leftAstNode = membExpr->getBase();
-        } while (isa<clang::MemberExpr>(leftAstNode));
-        auto left = mapToDst(leftAstNode, sourceMgr);
+        auto left = mapToDst(membExpr->getBase(), sourceMgr);
         return new ExpressionDomainMemberExprNode((clang::MemberExpr*)membExpr, left, right);
     }
     if (auto arr_sub_expr = dyn_cast<clang::ArraySubscriptExpr>(node))

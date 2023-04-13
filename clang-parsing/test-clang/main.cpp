@@ -66,7 +66,7 @@ private:
                 return;
 
             auto normalizedExpressionStr = dstNode->toString();
-            cout << normalizedExpressionStr << endl;
+            // cout << normalizedExpressionStr << endl;
             auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
             auto rdfString = rdfTreeToString(rdfTree);
 
@@ -246,7 +246,9 @@ int main(int argc, const char** argv) {
                        unaryOperator(hasOperatorName("--")),
                        binaryOperator(isAssignmentOperator()),
                        binaryOperator(isComparisonOperator()),
-                       cxxMemberCallExpr()))
+                       cxxMemberCallExpr(), 
+                       memberExpr(),
+                       conditionalOperator()))
                 .bind("exressionDomain");
         Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, exressionDomainMatcher), &Printer);
     } else {
