@@ -114,8 +114,8 @@ def repair_statements_in_graph(g, gl=None):
     return g
 
 
-def convert_graph_to_json(g):
-    'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, remove acts & boundaries.'
+def convert_graph_to_json(g, remove_acts_bounds=True):
+    'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, and (if requested) remove acts & boundaries.'
 
     patch_graph(g)
 
@@ -156,18 +156,19 @@ def convert_graph_to_json(g):
             expr_values[str(stmt_name)] = values
 
 
-    # remove all act & boundary
-    for s in [
-            *g.subjects(gl(':executes'), None),
-            *g.subjects(gl(':boundary_of'), None),
-            # *g.subjects(RDF.type, gl(':act_begin')),
-            # *g.subjects(RDF.type, gl(':act_end')),
-            # *g.subjects(RDF.type, gl(':boundary')),
-    ]:
-        if (s, RDF.type, gl(':algorithm')) in g:
-            continue
-        g.remove((s, None, None))
-        # g.remove((None, None, s))
+    if remove_acts_bounds:
+        # remove all act & boundary
+        for s in [
+                *g.subjects(gl(':executes'), None),
+                *g.subjects(gl(':boundary_of'), None),
+                # *g.subjects(RDF.type, gl(':act_begin')),
+                # *g.subjects(RDF.type, gl(':act_end')),
+                # *g.subjects(RDF.type, gl(':boundary')),
+        ]:
+            if (s, RDF.type, gl(':algorithm')) in g:
+                continue
+            g.remove((s, None, None))
+            # g.remove((None, None, s))
 
     # rename global code (update stmt_name)
     for a in g.objects(None, gl(':global_code')):

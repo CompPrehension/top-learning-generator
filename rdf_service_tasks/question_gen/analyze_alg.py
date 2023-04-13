@@ -538,7 +538,7 @@ def makeQuestionGraph(way: Way, g, gl):
         ## print("> node:", node)
         # boundary & act info
         # is_begin = ( bound, gl(':begin_of'), None ) in g
-        is_end = (bound, gl(':end_of'), None) in g
+        is_end = (bound, gl(':begin_of'), None) not in g  # (`halt_of` may exist as well)
         phase_mark = 'e' if is_end else 'b'  # begin is default - for first 'algorithm' node
 
         if phase_mark == 'e' and prev_phase == 'b':

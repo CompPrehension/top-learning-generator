@@ -1570,7 +1570,7 @@ def generate_data_for_question(q_row_instance):
     # gl = graph_lookup(g, PREFIXES)
 
     from full_questions import convert_graph_to_json
-    alg_json = convert_graph_to_json(g)
+    alg_json = convert_graph_to_json(g, remove_acts_bounds=False)
 
     # ## dump alg_json to debug
     # # fileService.sendFile(file_subpath[:-4] + 'src.json',
