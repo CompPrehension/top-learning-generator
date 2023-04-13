@@ -1,9 +1,9 @@
 # service.py
 
-'''
+"""
     Entry point (main module) for question-creation service, a part of CompPrehension project.
     @ 2022
-'''
+"""
 
 import json
 from math import exp
@@ -11,6 +11,7 @@ import math
 import random  # using random.seed
 import re
 import sys
+from statistics import fmean as avg
 
 import fs
 import rdflib
@@ -20,7 +21,7 @@ import yaml
 from analyze_alg import generate_questions_for_algorithm, set_interrupt_flag
 from chain_utils import builder
 from GraphRole import GraphRole
-from NamespaceUtil import NamespaceUtil
+# from NamespaceUtil import NamespaceUtil
 from ns4guestions import *
 from rdflib_utils import graph_lookup, uploadGraph, get_class_descendants_rdf, get_leaf_classes_rdf
 from RemoteFileService import RemoteFileService
@@ -28,8 +29,9 @@ from sparql_wrapper import Sparql
 from analyze_alg import jsObj
 
 import sqlite_questions_metadata as dbmeta
-from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, createQuestionTemplateDB, createQuestionDB
 
+# from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, \
+#     createQuestionTemplateDB, createQuestionDB
 
 sys.path.insert(1, '../../../c_owl/')
 if 0:
@@ -40,7 +42,6 @@ from ctrlstrct_test import make_question_dict_for_alg_json
 from ctrlstrct_run import run_jenaService_with_rdfxml
 ### inspecting loading of qG
 from common_helpers import Checkpointer
-
 
 # using patched version of SPARQLBurger
 from SPARQLBurger.SPARQLQueryBuilder import *
@@ -63,7 +64,7 @@ REMOVE_TRIPLES_FOR_PRODUCTION = True  # only when saving graph to file
 
 GATHER_DB_SIZE_INFO = False
 
-qG = None  # guestions graph (pre-fetched)
+qG = None  # questions graph (pre-fetched)
 fileService = None
 sparql_endpoint = None
 
@@ -91,7 +92,7 @@ def read_access_config(file_path='./access_urls.yml'):
 
 
 def _get_rdfdb_stats_collectors():
-    'init StateWatcher to watch dataset size on disk as well as number of triples in th dataset.'
+    """init StateWatcher to watch dataset size on disk as well as number of triples in th dataset."""
 
     if not GATHER_DB_SIZE_INFO:
         return ()
@@ -107,7 +108,8 @@ def _get_rdfdb_stats_collectors():
     def watch_triples():
         if sparql_endpoint:
             # Число триплетов в датасете
-            query_results = sparql_endpoint.query("select (count(*) as ?count) {graph ?g {?s ?p ?o}} ", return_format="json")
+            query_results = sparql_endpoint.query("select (count(*) as ?count) {graph ?g {?s ?p ?o}} ",
+                                                  return_format="json")
             row = query_results['results']['bindings'][0]
             count = row['count']['value']
             # del query_results
@@ -174,21 +176,22 @@ def makeUpdateTripleQuery(ng, s, p, o, prefixes=()):
         ).builder
     )
 
-    return(update_query.get_text())
+    return update_query.get_text()
+
 
 # >>>
 # makeUpdateTripleQuery('<ng>', '?s', '?p', '?o')
-    # DELETE { GRAPH <ng> {
-    #    ?s ?p ?obj .
-    # } }
-    # INSERT { GRAPH <ng> {
-    #    ?s ?p ?o .
-    # } }
-    # WHERE { GRAPH <ng> {
-    #    OPTIONAL {
-    #       ?s ?p ?obj .
-    #    }
-    # } }
+# DELETE { GRAPH <ng> {
+#    ?s ?p ?obj .
+# } }
+# INSERT { GRAPH <ng> {
+#    ?s ?p ?o .
+# } }
+# WHERE { GRAPH <ng> {
+#    OPTIONAL {
+#       ?s ?p ?obj .
+#    }
+# } }
 
 
 def makeInsertTriplesQuery(named_graph, triples, prefixes=()):
@@ -202,9 +205,9 @@ def makeInsertTriplesQuery(named_graph, triples, prefixes=()):
 
     # Create a graph pattern for the INSERT part and add a triple
     update_query.set_insert_pattern(
-            builder(SPARQLGraphPattern(graph_name=named_graph)).add_triples(
-                triples=[Triple(*t) for t in triples]
-            ).builder
+        builder(SPARQLGraphPattern(graph_name=named_graph)).add_triples(
+            triples=[Triple(*t) for t in triples]
+        ).builder
     )
     # patch keyword
     text = update_query.get_text()
@@ -216,25 +219,27 @@ def makeInsertTriplesQuery(named_graph, triples, prefixes=()):
 def URI(uri):
     return "<%s>" % uri
 
+
 def questionSubgraphPropertyFor(role: GraphRole) -> str:
     return NS_questions.get("has_graph_" + role.ns().base());
+
 
 def tableFieldForRoleDB(role: GraphRole) -> str:
     return NamespaceUtil.make_base(role.prefix) + "_graph";
 
 
-def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
-    'get names of questions with `rdf:nil` set for specified graph'
+def unsolvedQuestions(unsolvedSubgraph: GraphRole) -> list:
+    """get names of questions with `rdf:nil` set for specified graph"""
     ng = URI(qG_URI);
 
     unsolvedTemplates = builder(SPARQLSelectQuery()
-    ).add_prefix(
+                                ).add_prefix(
         Prefix('rdf', PREFIXES['rdf'])
     ).add_variables(
         ["?name"]
     ).set_where_pattern(
         builder(SPARQLGraphPattern(graph_name=ng)
-        ).add_triples([
+                ).add_triples([
             Triple("?node", URI(NS_questions.get("name")), "?name"),
             Triple("?node", URI(questionSubgraphPropertyFor(unsolvedSubgraph)), 'rdf:nil'),
         ]).builder
@@ -245,35 +250,35 @@ def unsolvedQuestions(unsolvedSubgraph:GraphRole) -> list:
     # del query_results
     return names
 
+
 # unsolved_qs = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
 
 
-
 def templatesWithoutQuestions(limit=None) -> list:
-    'get names of question templates without questions'
+    """get names of question templates without questions"""
     ng = URI(qG_URI);
 
     lonelyTemplates = builder(SPARQLSelectQuery()
-    ).add_prefix(
+                              ).add_prefix(
         Prefix('rdf', PREFIXES['rdf'])
     ).add_variables(
         ["?name"]
     ).set_where_pattern(
         builder(SPARQLGraphPattern(graph_name=ng)
-        ).add_triples([
+                ).add_triples([
             Triple("?node", 'rdf:type', URI(NS_questions.get("QuestionTemplate"))),
             Triple("?node", URI(NS_questions.get("name")), "?name"),
         ]).add_nested_graph_pattern(
             builder(SPARQLGraphPattern(keyword="FILTER NOT EXISTS")
-            ).add_triples([
+                    ).add_triples([
                 Triple("?absent_q", URI(NS_questions.get("has_template")), '?node'),
             ]).builder
         ).add_nested_graph_pattern(
             builder(SPARQLGraphPattern(keyword="FILTER NOT EXISTS")
-            ).add_triples([
+                    ).add_triples([
                 Triple("?node",
-                    URI(questionSubgraphPropertyFor(GraphRole.QUESTION_TEMPLATE_SOLVED)),
-                    "rdf:nil"),
+                       URI(questionSubgraphPropertyFor(GraphRole.QUESTION_TEMPLATE_SOLVED)),
+                       "rdf:nil"),
             ]).builder
         ).builder
     ).builder.get_text()
@@ -286,6 +291,7 @@ def templatesWithoutQuestions(limit=None) -> list:
     # del query_results
     return names
 
+
 # templates_to_create_questions = templatesWithoutQuestions()
 
 
@@ -296,6 +302,7 @@ WHERE { GRAPH <%s> {
    ?s ?p ?o .
 } }
 '''
+
 
 def fetchGraph(gUri: str, verbose=False):
     format_request, format_parse = "turtle", 'n3'
@@ -315,6 +322,7 @@ def fetchGraph(gUri: str, verbose=False):
         g = query_result
     if verbose: ch.since_start('fetchGraph: done in:')
     return g
+
 
 # q_graph = fetchGraph(qG_URI)
 if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
@@ -384,53 +392,54 @@ def questionStages():
 
 
 def findQuestionByName(questionName, questions_graph=qG):
-        qG = questions_graph or fetchGraph(qG_URI);
-        if qG:
-            qNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionName))
-            if qNode:
-                return qNode
+    qG = questions_graph or fetchGraph(qG_URI);
+    if qG:
+        qNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionName))
+        if qNode:
+            return qNode
 
-        print("    (No question found for name: %s)" % questionName)
-        return None;
-
-
-def nameForQuestionGraph(questionName, role:GraphRole, questions_graph=qG, file_ext=".ttl", fileService=fileService):
-        # look for <Question>-<subgraph> relation in metadata first
-        qG = questions_graph or fetchGraph(qG_URI);
-        targetGraphUri = None
-
-        if qG:
-            qNode = findQuestionByName(questionName)
-            # qNode = findQuestionOrTemplateByNameDB(questionName)
-            if qNode:
-                targetGraphUri = qG.value(
-                    qNode,
-                    rdflib.URIRef(questionSubgraphPropertyFor(role)),
-                    None)
-                if targetGraphUri == RDF.nil:
-                    targetGraphUri = None
-
-        if targetGraphUri:
-            qsgName = str(targetGraphUri)
-            return NS_file.localize(qsgName);
-
-        # no known relation - get default for a new one
-        print("    (No question graph found for Role '%s' and name: %s)" % (role.prefix, questionName))
-        return fileService.prepareNameForFile(role.ns().get(questionName + file_ext), False);
+    print("    (No question found for name: %s)" % questionName)
+    return None;
 
 
-def getSubpathForQuestionGraph(name, role:GraphRole, file_ext=".ttl", fileService=fileService):
+def nameForQuestionGraph(questionName, role: GraphRole, questions_graph=qG, file_ext=".ttl", fileService=fileService):
+    # look for <Question>-<subgraph> relation in metadata first
+    qG = questions_graph or fetchGraph(qG_URI);
+    targetGraphUri = None
+
+    if qG:
+        qNode = findQuestionByName(questionName)
+        # qNode = findQuestionOrTemplateByNameDB(questionName)
+        if qNode:
+            targetGraphUri = qG.value(
+                qNode,
+                rdflib.URIRef(questionSubgraphPropertyFor(role)),
+                None)
+            if targetGraphUri == RDF.nil:
+                targetGraphUri = None
+
+    if targetGraphUri:
+        qsgName = str(targetGraphUri)
+        return NS_file.localize(qsgName);
+
+    # no known relation - get default for a new one
+    print("    (No question graph found for Role '%s' and name: %s)" % (role.prefix, questionName))
+    return fileService.prepareNameForFile(role.ns().get(questionName + file_ext), False);
+
+
+def getSubpathForQuestionGraph(name, role: GraphRole, file_ext=".ttl", fileService=fileService):
     file_path = role.ns().get(name)
     if not file_path.endswith(file_ext):
         file_path += file_ext
     return fileService.prepareNameForFile(file_path);
 
 
-
 def getQuestionSubgraph(questionName, role, fileService=fileService):
     return fileService.fetchModel(nameForQuestionGraph(questionName, role));
 
-def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, subgraph_name=None, fileService=fileService):
+
+def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, subgraph_name=None,
+                        fileService=fileService):
     qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     if model:
         fileService.sendModel(qgUri, model);
@@ -441,10 +450,10 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
     qgNode = NS_file.get(qgUri);
 
     upd_setGraph = makeUpdateTripleQuery(
-            rdflib.URIRef(qG_URI).n3(),
-            questionNode.n3(),
-            rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
-            rdflib.URIRef(qgNode).n3()
+        rdflib.URIRef(qG_URI).n3(),
+        questionNode.n3(),
+        rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
+        rdflib.URIRef(qgNode).n3()
     );
 
     ### print(upd_setGraph)
@@ -462,17 +471,18 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
         insert_concepts_query = makeInsertTriplesQuery(
             named_graph=rdflib.URIRef(qG_URI).n3(),
             triples=[
-                    (questionNode.n3(),
-                     has_concept_qs,
-                     rdflib.Literal(concept_str).n3())
-                    for concept_str in concepts
-                ]
+                (questionNode.n3(),
+                 has_concept_qs,
+                 rdflib.Literal(concept_str).n3())
+                for concept_str in concepts
+            ]
         )
         res = sparql_endpoint.update(insert_concepts_query)
         print('      SPARQL: insert concepts query response-code:', res.response.code)
 
 
-def setQuestionSubgraphDB(row_instance, role, new_stage:int, model: Graph, subgraph_path=None, fileService=fileService, _debug_path_suffix=None):
+def setQuestionSubgraphDB(row_instance, role, new_stage: int, model: Graph, subgraph_path=None, fileService=fileService,
+                          _debug_path_suffix=None):
     # qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     file_subpath = subgraph_path or getSubpathForQuestionGraph(row_instance.name, role)
     db_field_name = tableFieldForRoleDB(role)
@@ -493,17 +503,15 @@ def setQuestionSubgraphDB(row_instance, role, new_stage:int, model: Graph, subgr
 
         dbmeta.update_bit_field(row_instance, 'concept_bits', dbmeta.names_to_bitmask(concepts, entity=dbmeta.Concepts))
 
-
     if new_stage > row_instance._stage:
         row_instance._stage = new_stage
     row_instance._version = dbmeta.TOOL_VERSION
     row_instance.save()
 
 
-def extract_graph_values(model: Graph, subject: rdflib.URIRef=None, predicate: rdflib.URIRef=None):
+def extract_graph_values(model: Graph, subject: rdflib.URIRef = None, predicate: rdflib.URIRef = None):
     objs = model.objects(subject, predicate)
     return [o.toPython() for o in objs]
-
 
 
 def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
@@ -550,13 +558,16 @@ def getQuestionModelDB(qt_or_q, topRole=GraphRole.QUESTION_SOLVED, fileService=f
         if (role == topRole): break;
     return m
 
+
 __schema4solving__m = None
+
 
 def ctrl_flow_schema(schema_path=r'c:/D/Work/YDev/CompPr/c_owl/jena/control-flow-statements-domain-schema.rdf'):
     global __schema4solving__m
     if not __schema4solving__m:
         __schema4solving__m = Graph().parse(schema_path)
     return __schema4solving__m
+
 
 def solve_template_with_jena(m: Graph, verbose=False, ) -> Graph:
     schema = ctrl_flow_schema()
@@ -578,10 +589,9 @@ def solve_template_with_jena(m: Graph, verbose=False, ) -> Graph:
     return g
 
 
-
 def solve_templates(limit=None) -> int:
-    ''' using jena via c_owl
-    '''
+    """ using jena via c_owl
+    """
 
     # templates_total = 0
     done_count = 0
@@ -608,10 +618,10 @@ def solve_templates(limit=None) -> int:
             # raise
             continue
 
-        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE_SOLVED, dbmeta.STAGE_QT_SOLVED, m)
+        setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE_SOLVED, dbmeta.STAGE_QT_SOLVED, m)
         done_count += 1
         if done_count % 20 == 0:
-            ch.hit(        '   + 20 templates solved')
+            ch.hit('   + 20 templates solved')
             ch.since_start('[%3d] time elapsed so far:' % done_count)
 
     ch.since_start("Solving templates completed, in")
@@ -620,6 +630,7 @@ def solve_templates(limit=None) -> int:
 
 
 __PATCH_TTL_RE = None
+
 
 def _patch_and_parse_ttl(opened_file):
     global __PATCH_TTL_RE
@@ -633,15 +644,16 @@ def _patch_and_parse_ttl(opened_file):
 
 
 def load_templates(limit=None) -> int:
-    ''' rdf metadata: ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
-    '''
+    """ rdf metadata: ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
+    """
 
     # templates_total = 0
     done_count = 0
 
     # qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
     ### re
-    qt_list = dbmeta.findTemplatesOnStageDB(stage = None and dbmeta.STAGE_QT_USED, limit=limit, version=dbmeta.TOOL_VERSION - 1)
+    qt_list = dbmeta.findTemplatesOnStageDB(stage=None and dbmeta.STAGE_QT_USED, limit=limit,
+                                            version=dbmeta.TOOL_VERSION - 1)
     if not qt_list:
         return 0
 
@@ -651,7 +663,7 @@ def load_templates(limit=None) -> int:
 
     for qt in qt_list:
 
-        path = CONFIG.src_ttl_dir + (qt.src_path)
+        path = CONFIG.src_ttl_dir + qt.src_path
         with open(path) as f:
             m = _patch_and_parse_ttl(f)
 
@@ -666,15 +678,51 @@ def load_templates(limit=None) -> int:
             qt.save()
             continue
 
-        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED, m)  ### , _debug_path_suffix='.v2'
+        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED,
+                                             m)  ### , _debug_path_suffix='.v2'
         done_count += 1
         if done_count % 20 == 0:
-            ch.hit(        '   + 20 templates created')
+            ch.hit('   + 20 templates created')
             ch.since_start('[%3d] time elapsed so far:' % done_count)
 
     ch.since_start("Loading templates completed, in")
     print("Loaded", done_count, 'templates of', len(qt_list), 'currently selected.')
     return len(qt_list)
+
+
+def play_extracting_concepts(g: rdflib.Graph):
+    gl = graph_lookup(g, PREFIXES)
+    data = {}
+    ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item') | gl(':body'))  ##  * '+'
+
+    # nesting_depth (0 = 1 level, 1 = 2 levels)
+    def action_depth(s):
+        children = g.objects(s, ppath)
+        return 1 + max([-1, *map(action_depth, children)])
+
+    root = [*g.objects(None, gl(':global_code'))][0]
+    max_depth = action_depth(root)
+    data['nesting_depth'] = max_depth
+    print("max_depth:", max_depth)
+
+    # find max loop nesting depth (1 = 1 loop, 1 = 2 loops, one in other)
+    loops = list(g.subjects(RDF.type, gl(':loop')))
+    # print("loops:", loops)
+
+    if not loops:
+        data['max_loop_nesting_depth'] = 0
+    else:
+        # count how many loops are in each loop ...
+        # in_loop__ppath = ~ppath * '+'
+        in_loop__ppath = gl(':hasPartTransitive') | ppath * '+';
+        nest_depths = [
+            sum((L, in_loop__ppath, L2) in g for L2 in loops if L2 is not L)
+            for L in loops
+        ]
+        data['max_loop_nesting_depth'] = max(nest_depths) + 1
+        # max_loop_nesting_depth = max(nest_depths) + 1
+        # print('max_loop_nesting_depth:', max_loop_nesting_depth)
+    return data
 
 
 def update_template_concepts(limit=None) -> int:
@@ -690,7 +738,9 @@ def update_template_concepts(limit=None) -> int:
     done_count = 0
 
     # qt_list = dbmeta.findTemplatesOnStageDB(dbmeta.STAGE_QT_FOUND, limit)
-    qt_list = dbmeta.findTemplatesOnStageDB(stage= None and dbmeta.STAGE_QT_SOLVED, limit=limit, version=dbmeta.TOOL_VERSION - 1)
+    qt_list = dbmeta.findTemplatesOnStageDB(stage=None and dbmeta.STAGE_QT_SOLVED, limit=limit,
+                                            version=dbmeta.TOOL_VERSION - 1)
+    # qt_list = [dbmeta.findQuestionOrTemplateByNameDB('warmup_15463328')]
     if not qt_list:
         return 0
 
@@ -725,7 +775,7 @@ def update_template_concepts(limit=None) -> int:
         done_count += 1
         print('\t\tsaved.')
         if done_count % 20 == 0:
-            ch.hit(        '   + 20 templates updated')
+            ch.hit('   + 20 templates updated')
             ch.since_start('[%3d] time elapsed so far:' % done_count)
 
     ch.since_start("Updating templates completed, in")
@@ -733,7 +783,7 @@ def update_template_concepts(limit=None) -> int:
     return len(qt_list)
 
 
-def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024), skip_first=0):
+def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3 * 1024, 40 * 1024), skip_first=0):
     ''' Find files and add info about them to DB
     '''
 
@@ -750,7 +800,7 @@ def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024
             if skip_first > 0 and files_total < skip_first:
                 continue
 
-            if file_size_filter and not(file_size_filter[0] <= info.size <= file_size_filter[1]):
+            if file_size_filter and not (file_size_filter[0] <= info.size <= file_size_filter[1]):
                 continue
             files_selected += 1
 
@@ -763,7 +813,6 @@ def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3*1024, 40*1024
 
     print("Searching for templates completed.")
     print("Used", files_selected, 'files of', files_total, 'in the directory.')
-
 
 
 def createQuestionTemplate(questionTemplateName) -> 'question template URI':
@@ -779,7 +828,6 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
     if templNodeExists:
         qtemplNode = qG.value(None, rdflib.URIRef(NS_questions.get("name")), rdflib.Literal(questionTemplateName));
         return qtemplNode
-
 
     nodeClass = rdflib.URIRef(NS_classQuestionTemplate.base())
 
@@ -797,18 +845,18 @@ def createQuestionTemplate(questionTemplateName) -> 'question template URI':
     )]));
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
-            qNode.n3(),
-            rdflib.URIRef(NS_questions.get("name")).n3(),
-            rdflib.Literal(questionTemplateName).n3()));
+                                          qNode.n3(),
+                                          rdflib.URIRef(NS_questions.get("name")).n3(),
+                                          rdflib.Literal(questionTemplateName).n3()));
 
     # initialize template's graphs as empty ...
     # using "template-only" roles
     for role in (GraphRole.QUESTION_TEMPLATE, GraphRole.QUESTION_TEMPLATE_SOLVED):
         obj = RDF.nil
         commands.append(makeUpdateTripleQuery(ngNode.n3(),
-                qNode.n3(),
-                rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
-                obj.n3()));
+                                              qNode.n3(),
+                                              rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
+                                              obj.n3()));
 
     full_query = '\n;\n'.join(commands)
 
@@ -827,7 +875,8 @@ class expr_bool_values:
         self.safe_value = safe_value
         self.delay = delay
         self.active = active
-        self.i = 0 # state for next()
+        self.i = 0  # state for next()
+
     def get(self, index):
         if index < self.delay or index >= (self.delay + self.active):
             return self.safe_value
@@ -838,15 +887,16 @@ class expr_bool_values:
     def __next__(self):
         self.i += 1
         return self.get(self.i - 1)
-    def __getitem__(self, index): return self.get(index)
+
+    def __getitem__(self, index):
+        return self.get(index)
 
 
 # itvs = expr_bool_values(1, 2)
 # [itvs[i] for i in range(10)]
 # [next(itvs) for _ in range(10)]
 # >>>
-    # [False, True, True, False, False, False, False, False, False, False]
-
+# [False, True, True, False, False, False, False, False, False, False]
 
 
 # /**
@@ -880,14 +930,14 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
     commands.append(makeUpdateTripleQuery(ngNode.n3(), qNode.n3(), RDF.type.n3(), nodeClass.n3()));
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
-            qNode.n3(),
-            rdflib.URIRef(NS_questions.get("name")).n3(),
-            rdflib.Literal(questionName).n3()));
+                                          qNode.n3(),
+                                          rdflib.URIRef(NS_questions.get("name")).n3(),
+                                          rdflib.Literal(questionName).n3()));
 
     commands.append(makeUpdateTripleQuery(ngNode.n3(),
-            qNode.n3(),
-            rdflib.URIRef(NS_questions.get("has_template")).n3(),
-            qtemplNode.n3()));
+                                          qNode.n3(),
+                                          rdflib.URIRef(NS_questions.get("has_template")).n3(),
+                                          qtemplNode.n3()));
 
     # copy references to the graphs from template as is ...
     # using "template-only" roles
@@ -902,15 +952,14 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
             GraphRole.QUESTION,
             GraphRole.QUESTION_SOLVED,
             GraphRole.QUESTION_DATA
-        ):
+    ):
         obj = RDF.nil
         if role == GraphRole.QUESTION and questionDataGraphUri:
             obj = rdflib.URIRef(questionDataGraphUri)
         commands.append(makeUpdateTripleQuery(ngNode.n3(),
-                qNode.n3(),
-                rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
-                obj.n3()));
-
+                                              qNode.n3(),
+                                              rdflib.URIRef(questionSubgraphPropertyFor(role)).n3(),
+                                              obj.n3()));
 
     # > add other metadata
     triples = []
@@ -918,12 +967,11 @@ def createQuestion(questionName, questionTemplateName, questionDataGraphUri=None
         if not isinstance(vals, (list, tuple)):
             vals = [vals]
         for v in vals:
-            triples.append(( qNode.n3(), URI(NS_questions.get(name)), rdflib.Literal(v).n3() ))
+            triples.append((qNode.n3(), URI(NS_questions.get(name)), rdflib.Literal(v).n3()))
 
     if triples:
-        commands.append(makeInsertTriplesQuery(ngNode.n3(), triples, )) ## PREFIXES
+        commands.append(makeInsertTriplesQuery(ngNode.n3(), triples, ))  # PREFIXES
     # < add other metadata
-
 
     # runQueries(commands);
 
@@ -961,7 +1009,8 @@ def sigmoid(x):
         return z / (1 + z)
 
 
-CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop return break continue".split()
+CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop return break continue".split()  # no `stmt` here.
+
 
 def question_metrics(g, gl, question_dict, quiet=False):
     data = {}
@@ -985,9 +1034,8 @@ def question_metrics(g, gl, question_dict, quiet=False):
         ?s :branches_item ?b . ?b a :alt_branch
     } group by ?s'''
     r = g.query(query, initNs=PREFIXES)
-    max_if_branches_count = max([next(iter(b.values())).toPython() if b else 0  for b in r.bindings])
+    max_if_branches_count = max([next(iter(b.values())).toPython() if b else 0 for b in r.bindings])
     data['max_if_branches'] = max_if_branches_count
-
 
     ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item'))  ##  * '+'
 
@@ -1011,14 +1059,13 @@ def question_metrics(g, gl, question_dict, quiet=False):
         # find reverse nesting: how many loops a loop is nested in?
         in_loop__ppath = ~ppath * '+'
         nest_depths = [
-            sum((L, in_loop__ppath, L2) in g  for L2 in loops if L2 is not L)
+            sum((L, in_loop__ppath, L2) in g for L2 in loops if L2 is not L)
             for L in loops
         ]
         data['max_loop_nesting_depth'] = max(nest_depths) + 1
 
         if add_structural_feature_concepts and data['max_loop_nesting_depth'] >= 2:
             concepts.append('nested_loop')  # note the name introduced here
-
 
     #### cyclomatic = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condtion count.
     values_count_plus_1 = len(question_dict['name_suffix']) + 1  # Bad way as values count is NOT condition count.
@@ -1038,9 +1085,9 @@ def question_metrics(g, gl, question_dict, quiet=False):
     # % [0.39399354, 0.16434003, 0.01391854, 0.05685927]
 
     learned_compexity = (0.39399354
-             + 0.16434003 * (len(concepts) + 2)
-             + 0.01391854 * solution_steps
-             + 0.05685927 * values_count_plus_1)
+                         + 0.16434003 * (len(concepts) + 2)
+                         + 0.01391854 * solution_steps
+                         + 0.05685927 * values_count_plus_1)
 
     complexity = learned_compexity
     x = (complexity - 2) * 5
@@ -1048,27 +1095,288 @@ def question_metrics(g, gl, question_dict, quiet=False):
     if not quiet: print('    Question complexity: %f  --> integral_complexity: %5f' % (complexity, integral))
 
     return dict(
-        solution_structural_complexity = round(complexity),
-        solution_steps = question_dict['length'],
-        distinct_errors_count = len(question_dict['possible_violations']),
-        integral_complexity = round(integral, 4),  # 5 digits precision
-        has_tag = tuple(tags),
-        has_concept = tuple(sorted(concepts)),
-        has_law = tuple(sorted(question_dict['laws'])),
-        has_violation = tuple(sorted(question_dict['possible_violations'])),
-        structural_complexity = data['actions_count'] + data['cyclomatic'],
-        **data
+        solution_structural_complexity=round(complexity),  # ???
+        solution_steps=question_dict['length'],
+        distinct_errors_count=len(question_dict['possible_violations']),
+        integral_complexity=round(integral, 4),  # 5 digits precision
+        has_tag=tuple(tags),
+        has_concept=tuple(sorted(concepts)),
+        has_law=tuple(sorted(question_dict['laws'])),
+        has_violation=tuple(sorted(question_dict['possible_violations'])),
+        structural_complexity=data['actions_count'] + data['cyclomatic'],
+        **data,  # data:
+        # 'actions_count'
+        # 'cyclomatic'
+        # 'max_if_branches'
+        # 'nesting_depth'
+        # 'max_loop_nesting_depth'
     )
 
 
+def question_trace_features(g, gl, q, quiet=False):
+    data = jsObj()
+    data.more_concepts = []
+    # data.flags = {}  # see below
+    data.numeric = {}
+
+    # has-nested relation
+    ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item'))  ##  * '+'
+
+    # seq_longer_than1 : следование (более 1 элемента)
+    # max seq child actions
+    query = '''SELECT (COUNT(?b) as ?n) where {
+        ?s a :sequence . ?s :body_item ?b .
+    } group by ?s'''
+    r = g.query(query, initNs=PREFIXES)
+    max_seq_child_actions = max([next(iter(b.values())).toPython() if b else 0 for b in r.bindings])
+    if max_seq_child_actions > 1:
+        data.more_concepts.append('seq_longer_than1')
+
+    data.numeric['longest_seq_count'] = max_seq_child_actions
+
+    # selection_count
+    query = 'SELECT (COUNT(distinct ?s) as ?n) where {?s a :alternative}'
+    r = g.query(query, initNs=PREFIXES)
+    selection_count = next(iter(r.bindings[0].values())).toPython()
+    data.numeric['selection_count'] = selection_count
+
+    # loop_count
+    query = 'SELECT (COUNT(distinct ?s) as ?n) where {?s a :loop}'
+    r = g.query(query, initNs=PREFIXES)
+    loop_count = next(iter(r.bindings[0].values())).toPython()
+    data.numeric['loop_count'] = loop_count
+
+    # max_selection_nesting_depth
+    alts = list(g.subjects(RDF.type, gl(':alternative')))
+    if not alts:
+        data.numeric['max_selection_nesting_depth'] = 0
+    elif len(alts) == 1:
+        data.numeric['max_selection_nesting_depth'] = 1
+    else:
+        # count how many alts are in each alt ...
+        in_alt__ppath = gl(':hasPartTransitive') | (ppath | gl(':body')) * '+';
+        nest_depths = [
+            sum((A, in_alt__ppath, A2) in g for A2 in alts if A2 is not A)
+            for A in alts
+        ]
+        data.numeric['max_selection_nesting_depth'] = max(nest_depths) + 1
+
+    # avg_if_branches
+    query = '''SELECT (COUNT(?b) as ?n) where {
+        ?s :branches_item ?b . ?b a :alt_branch
+    } group by ?s'''
+    r = g.query(query, initNs=PREFIXES)
+    avg_if_branches_count = avg([next(iter(b.values())).toPython() if b else 0 for b in r.bindings])
+    data.numeric['avg_if_branches'] = avg_if_branches_count
+
+    trace_data = _trace_features(g, gl, q, quiet)
+    data.numeric = {**data.numeric, **trace_data.numeric}
+    data.flags = trace_data.flags
+
+    return data
+
+
+def _trace_features(g, gl, q, quiet=False):
+    from collections import defaultdict
+
+    data = jsObj()
+    data.flags = {}  # see below
+    data.numeric = {}
+
+    act_begin = gl(':act_begin')
+    act_end = gl(':act_end')
+    executes = gl(':executes')
+    _next = gl(':next')
+    next_act = gl(':next_act')
+    boundary_of = gl(':boundary_of')
+    begin_of = gl(':begin_of')
+    end_of = gl(':end_of')
+    cond = gl(':cond')
+    branches_item = gl(':branches_item')
+    body = gl(':body')
+    expr_value = gl(':expr_value')
+    _true = rdflib.Literal(True)
+    _false = rdflib.Literal(False)
+
+    # fetch trace first
+    acts = []
+    first_acts = list(set(g.subjects(executes / RDF.type, gl(':algorithm'))))
+    if first_acts:
+        acts.append(first_acts[0])
+        act_inst = acts[0]
+        while (act_inst := g.value(act_inst, next_act)):
+            acts.append(act_inst)
+
+    assert acts, (acts, first_acts)
+
+    # 2+of-seq (выполнилось более 1 элемента следования (не 100% равно что такое следование есть т.к. return/break/continue))
+    for inst, next_inst in zip(acts[:-1], acts[1:]):
+        # pair-wise: check if subsequent acts run actions of the same seq
+        if (
+                (inst, RDF.type, act_end) in g
+                and
+                (next_inst, RDF.type, act_begin) in g
+                and
+                (
+                        g.value(next_inst, executes / boundary_of, None) ==
+                        g.value(next_inst, executes / boundary_of, None)
+                )
+        ):
+            st1 = g.value(next_inst, executes / boundary_of, None)
+            st2 = g.value(next_inst, executes / boundary_of, None)
+            if st1 == st2 and (st1, RDF.type, gl(':sequence')) in g:
+                # yes
+                data.flags['2+of-seq'] = True
+                break
+
+    # 'if-cond-is-true'
+    if_expr_acts = set(g.subjects(executes / end_of / ~cond / RDF.type, gl(':if')))
+    if if_expr_acts:
+        if_cond_is_true = any((e, expr_value, _true) in g for e in if_expr_acts)
+        if if_cond_is_true:
+            data.flags['if-cond-is-true'] = True
+
+        # when cond is false...
+        # if-cond-is-false_having-1-branch
+        # if-cond-is-false_having-else-only
+        # if-cond-is-false_having-elseif
+        for e in if_expr_acts:
+            if (e, expr_value, _false) in g:
+                branch = g.value(e, executes / end_of / ~cond, None)
+                next_branch = g.value(branch, _next, None)
+                if not next_branch:
+                    data.flags['if-cond-is-false_having-1-branch'] = True
+                elif (next_branch, RDF.type, gl(':else')) in g:
+                    data.flags['if-cond-is-false_having-else-only'] = True
+                elif (next_branch, RDF.type, gl(':else-if')) in g:
+                    data.flags['if-cond-is-false_having-elseif'] = True
+
+    # 'elseif-cond-is-true'
+    elseif_expr_acts = set(g.subjects(executes / end_of / ~cond / RDF.type, gl(':else-if')))
+    if elseif_expr_acts:
+        elseif_cond_is_true = any((e, expr_value, _true) in g for e in elseif_expr_acts)
+        if elseif_cond_is_true:
+            data.flags['elseif-cond-is-true'] = True
+
+        # when cond is false...
+        # elseif-cond-is-false_having-elseif-next
+        # elseif-cond-is-false_having-else-next
+        # elseif-cond-is-false_and-last
+        for e in elseif_expr_acts:
+            if (e, expr_value, _false) in g:
+                branch = g.value(e, executes / end_of / ~cond, None)
+                next_branch = g.value(branch, _next, None)
+                if not next_branch:
+                    data.flags['elseif-cond-is-false_and-last'] = True
+                elif (next_branch, RDF.type, gl(':else')) in g:
+                    data.flags['elseif-cond-is-false_having-else-next'] = True
+                elif (next_branch, RDF.type, gl(':else-if')) in g:
+                    data.flags['elseif-cond-is-false_having-elseif-next'] = True
+
+    # loops: localize iterations over trace
+    # warning: (?) recursion is not taken into account (TODO)
+    # corresponding_end = gl(':corresponding_end')
+    # any_corresponding_end = list(g.subject_objects(corresponding_end))  # no!
+
+    action_stack = []  # [{action: URIRef, type: str, expr_values: [], }]
+    action_types = tuple(map(gl, ':alternative :for_loop :while_loop :do_while_loop'.split()))
+    interrupt_types = tuple(map(gl, ':return :break :continue'.split()))
+    selection_to_branches_entered = defaultdict(int)
+    loop_to_iterations_entered = defaultdict(int)
+    for act_inst in acts:
+        action = g.value(act_inst, executes / boundary_of, None)
+        if not action:
+            continue  # skip `algorithm`
+        if (act_inst, RDF.type, act_begin) in g and (act_inst, executes / begin_of, None) in g:
+            for action_type in action_types:
+                if (action, RDF.type, action_type) in g:
+                    action_stack.append(jsObj(
+                        action=action,
+                        type=NS_code.localize(action_type.toPython()),
+                        expr_values=[],
+                    ))
+                    break  # inner for
+
+            # 'max_if_branches_entered'
+            if (selection_st := g.value(action, ~branches_item, None)) is not None:
+                selection_to_branches_entered[selection_st] += 1
+                ### print('selection_st:', selection_st, '---', selection_to_branches_entered[selection_st], ' act:', act_inst)
+
+            # 'avg_iterations', 'max_iterations'
+            if (loop_st := g.value(action, ~body, None)) and ((loop_st, RDF.type, gl('loop')) in g):
+                loop_to_iterations_entered[loop_st] += 1
+
+        else:
+        # elif (act_inst, RDF.type, act_end) in g:
+            # cond value
+            if (act_value := g.value(act_inst, expr_value, None)) is not None:
+                bool_value = act_value.toPython()
+                if action_stack:
+                    action_stack[-1].expr_values.append(bool_value)
+                    enclosing_action = action_stack[-1].type
+                    if enclosing_action.endswith('_loop'):
+                        loop_name = enclosing_action[:-len('_loop')]
+                        iteration_n = len(action_stack[-1].expr_values)
+                        if iteration_n > 2 or iteration_n == 2 and (bool_value is False or loop_name == 'do_while'):
+                            continue  # need not record anything about this cond act
+                        flag_name = f"{loop_name}-cond-is-{str(bool_value).lower()}_at-iteration-{iteration_n}"
+                        data.flags[flag_name] = True
+                continue
+
+            if action_stack and action == action_stack[-1].action:
+                action_stack.pop()
+                continue
+
+            for action_type in interrupt_types:
+                if (action, RDF.type, action_type) in g:
+                    action_kind = NS_code.localize(action_type.toPython())
+                    if action_kind == 'return' and not action_stack:
+                        # hard guard (since there are some bugs with interrupting flow in generator)
+                        if 'return-in-selection' not in data.flags and 'return-in-loop' not in data.flags:
+                            data.flags['return-in-toplevel-code'] = True
+                            break
+
+                    if action_stack:
+                        enclosing_action = action_stack[-1].type
+                        if enclosing_action == 'alternative':
+                            flag_name = f"{action_kind}-in-selection"
+                            data.flags[flag_name] = True
+                            break
+
+                        if enclosing_action.endswith('_loop'):
+                            if action_kind == 'return':
+                                data.flags['return-in-loop'] = True
+                                break
+
+                            # check if outer loop present
+                            is_loop_nested = False
+                            for outer_action in reversed(action_stack[:-1]):
+                                if outer_action.endswith('_loop'):
+                                    is_loop_nested = True
+                                    break
+                            flag_name = f"{action_kind}-in-{'nested' if is_loop_nested else 'toplevel'}-loop"
+                            data.flags[flag_name] = True
+                    break
+    # finished `for` over acts.
+
+    data.numeric['max_if_branches_entered'] = max(list(selection_to_branches_entered.values()) or [0])
+
+    iterations_count = list(loop_to_iterations_entered.values()) or [0]
+    data.numeric['max_iterations'] = max(iterations_count)
+    data.numeric['avg_iterations'] = avg(iterations_count)
+
+    return data
+
+
 import threading
-import time
+
 CREATE_TRACES_TIMEOUT = 15  # seconds
 
 # CLAMP_COMPLEXITY = (0.1, 0.6)
 # CLAMP_COMPLEXITY = (0.1, 0.8)
 CLAMP_COMPLEXITY = (0.5, 1.0)
 MAX_ACTIONS_COUNT = 20
+
 
 def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY):
     qtname = qt if isinstance(qt, str) else qt.name
@@ -1080,12 +1388,11 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
     # from full_questions import repair_statements_in_graph
     # g = repair_statements_in_graph(g, gl)
 
-
     # old code: just call it
     # questions = generate_questions_for_algorithm(g, gl)
 
     # new code: kill process on timeout
-    questions = None ## ()  # nothing by default
+    questions = None  ## ()  # nothing by default
 
     def process_one(g, gl):
         nonlocal questions
@@ -1094,27 +1401,27 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
     t = threading.Thread(target=process_one, args=(g, gl))
     set_interrupt_flag(False)
     t.start()
-        # Wait for at most 30 seconds for the thread to complete.
+    # Wait for at most 30 seconds for the thread to complete.
     t.join(CREATE_TRACES_TIMEOUT)
     set_interrupt_flag(True)
-        # Now join without a timeout knowing that the thread is either already
-        # finished or will finish "soon".
+    # Now join without a timeout knowing that the thread is either already
+    # finished or will finish "soon".
     t.join()
 
     # [{'name_suffix': '000',
-        #     'length': 18,
-        #     'depth': 7,        # < TODO
-        #     'laws': frozenset({'AltBegin',
-        #                'AltEndAllFalse',
-        #                'SequenceBegin',
-        #                'SequenceEnd',
-        #                'SequenceNext'}),
-        #     'possible_violations': frozenset({'DuplicateOfAct',
-        #                'LastFalseNoEnd',
-        #                'NoFirstCondition',
-        #                'SequenceFinishedTooEarly',
-        #                'TooEarlyInSequence'}),
-        #     'rdf': <Graph>}]
+    #     'length': 18,
+    #     'depth': 7,        # < TODO
+    #     'laws': frozenset({'AltBegin',
+    #                'AltEndAllFalse',
+    #                'SequenceBegin',
+    #                'SequenceEnd',
+    #                'SequenceNext'}),
+    #     'possible_violations': frozenset({'DuplicateOfAct',
+    #                'LastFalseNoEnd',
+    #                'NoFirstCondition',
+    #                'SequenceFinishedTooEarly',
+    #                'TooEarlyInSequence'}),
+    #     'rdf': <Graph>}]
 
     print("Total questions generated: ", questions and len(questions) or 0)
 
@@ -1159,7 +1466,6 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
         print("  Saving question: ", question_name, ' --> ', file_path)
         ### continue
 
-
         model = question['rdf']
         print("    Uploading model ...")  # "for question '%s' ... " % question_name)
         # uploadGraph(gUri, model, fuseki_update)
@@ -1171,8 +1477,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
             except:
                 continue
 
-
-        q = dbmeta.createQuestionDB(question_name, qt, q_graph=file_path, metrics=metrics)
+        dbmeta.createQuestionDB(question_name, qt, q_graph=file_path, metrics=metrics)
         used_questions += 1
 
         # gUri = NS_file.get(file_path)
@@ -1182,9 +1487,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
     return used_questions
 
 
-
 def generate_questions_for_templates(offset=None, limit=None):
-
     print("Requesting templates without questions ...", flush=True)
     # if limit:
     #     sparql_limit = limit
@@ -1197,7 +1500,6 @@ def generate_questions_for_templates(offset=None, limit=None):
 
     ### debugging: get existing questions instead
     # templates_to_create_questions = list({n[:n.rfind("_v")] for n in unsolvedQuestions(GraphRole.QUESTION_SOLVED)})
-
 
     print('Templates without questions found: %d' % len(templates_to_create_questions))
 
@@ -1230,7 +1532,7 @@ def generate_questions_for_templates(offset=None, limit=None):
         print("Processing template: ", qtname)
         print("    (skipped so far: %d)" % skip_count)
         print("========")
-        if qtname in ('curl_mvsnprintf', ):
+        if qtname in ('curl_mvsnprintf',):
             print('intended skip.')
             continue
         try:
@@ -1242,7 +1544,7 @@ def generate_questions_for_templates(offset=None, limit=None):
             qt._version = dbmeta.TOOL_VERSION
             qt.save()
             if questions_made > 0:
-                ch.hit(        '   + 1 template used')
+                ch.hit('   + 1 template used')
                 ch.since_start('[%3d] time elapsed so far:' % (templates_used + skip_count))
         except NotImplementedError as e:
             skip_count += 1
@@ -1252,7 +1554,6 @@ def generate_questions_for_templates(offset=None, limit=None):
             print()
 
         if questions_count > limit:  break
-
 
     print()
     ch.since_start("Completed in")
@@ -1288,12 +1589,13 @@ def generate_data_for_question(q_row_instance):
 
         # print('    Uploading json file ...')
         fileService.sendFile(file_subpath,
-            json.dumps(q_dict, ensure_ascii=False).encode()
-            # json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
-        )
+                             json.dumps(q_dict, ensure_ascii=False).encode()
+                             # json.dumps(q_dict, ensure_ascii=False, indent=2).encode()
+                             )
 
         # setQuestionSubgraph(qname, GraphRole.QUESTION_DATA, model=None, subgraph_name=file_subpath)
-        setQuestionSubgraphDB(q, GraphRole.QUESTION_DATA, dbmeta.STAGE_Q_DATA_SAVED, model=None, subgraph_path=file_subpath)
+        setQuestionSubgraphDB(q, GraphRole.QUESTION_DATA, dbmeta.STAGE_Q_DATA_SAVED, model=None,
+                              subgraph_path=file_subpath)
 
         return 1
     except Exception as e:
@@ -1307,7 +1609,6 @@ def generate_data_for_question(q_row_instance):
 
 
 def generate_data_for_questions(offset=None, limit=None):
-
     print("Requesting questions without data ...", flush=True)
 
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
@@ -1316,7 +1617,6 @@ def generate_data_for_questions(offset=None, limit=None):
 
     ### debugging: get all existing questions instead
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_SOLVED)
-
 
     print('Questions without data found: %d' % len(questions_to_process))
 
@@ -1353,7 +1653,7 @@ def generate_data_for_questions(offset=None, limit=None):
 
 def make_questions__main():
     if 1:
-        generate_questions_for_templates(0, None) # 30
+        generate_questions_for_templates(0, None)  # 30
         exit(0)
     else:
         # qtname = 'packet_queue_get'
@@ -1362,7 +1662,6 @@ def make_questions__main():
         questions_count = process_template(qtname)
         print()
         print(questions_count, 'questions created for template.')
-
 
     '''
     Templates without questions found: 24  (of 1 315)
@@ -1416,12 +1715,14 @@ def float_range(start, stop, step):
         yield float(start)
         start += step  #### += decimal.Decimal(step)
 
-def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph='http://vstu.ru/poas/selected_questions', size=100, bins=20):
+
+def make_questions_sample(src_graph='http://vstu.ru/poas/questions',
+                          dest_graph='http://vstu.ru/poas/selected_questions', size=100, bins=20):
     ''' Copy a sample of questions with templates from src named graph to dest named graph keeping all the range of available complexity '''
     import random
 
     if not INIT_GLOBALS:
-    # if not sparql_endpoint:
+        # if not sparql_endpoint:
         read_access_config()
         #### fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
         sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
@@ -1434,8 +1735,8 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
     }}''' % src_graph
 
     query_results = sparql_endpoint.query(select_all_questions, return_format="json")
-    cplx_qs = [(float(b['complexity']['value']), b['q']['value'] )
-        for b in query_results['results']['bindings']]
+    cplx_qs = [(float(b['complexity']['value']), b['q']['value'])
+               for b in query_results['results']['bindings']]
     del query_results
     print(len(cplx_qs), 'questions total.')
 
@@ -1482,7 +1783,8 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions', dest_graph=
     print('Finished selecting questions.')
 
 
-def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', target_zip='./selected_questions-files.zip'):
+def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions',
+                           target_zip='./selected_questions-files.zip'):
     import fs
     import fs.copy
     from fs import open_fs
@@ -1490,7 +1792,7 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
     import zipfile
 
     if not INIT_GLOBALS:
-    # if not sparql_endpoint:
+        # if not sparql_endpoint:
         read_access_config()
         # fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
         sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
@@ -1510,7 +1812,7 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
 
     query_results = sparql_endpoint.query(select_all_files, return_format="json")
     file_uris = [b['f']['value']
-        for b in query_results['results']['bindings']]
+                 for b in query_results['results']['bindings']]
     del query_results
 
     # convert to paths & filter "blank" values
@@ -1546,6 +1848,7 @@ def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions', t
 
     print('Archive saved.')
 
+
 def just_rdfdb_monitoring():
     from time import sleep
     sw = CONFIG.rdfdb_watcher
@@ -1559,6 +1862,7 @@ def _insert_triples(triples, ng_uri=rdflib.URIRef(qG_URI).n3()):
     sparql_text = makeInsertTriplesQuery(ng_uri, triples)
     sparql_endpoint.update(sparql_text)
 
+
 def measure_disk_usage_uploading_questions(rdf_src_filepath='c:/Temp2/compp/control_flow.ttl'):
     'Note: set PREFETCH_QUESTIONS = False'
     g = rdflib.Graph().parse(rdf_src_filepath)
@@ -1571,7 +1875,6 @@ def measure_disk_usage_uploading_questions(rdf_src_filepath='c:/Temp2/compp/cont
 
 
 def _upload_graph(g, ng_uri, batch_size=-1, verbose=True):
-
     batch = []
     i = 0
 
@@ -1610,7 +1913,7 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
                 qsgName = str(targetGraphUri)
                 target_model_paths.append(
                     (qsgName, NS_file.localize(qsgName))
-                    )
+                )
             else:
                 print('... not a graph!')
 
@@ -1633,7 +1936,6 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
 
 
 def automatic_pipeline(batch=700, offset=0):
-
     # if load_templates(limit=batch) > 20:  # note 14 errors
     #     return
 
@@ -1649,20 +1951,19 @@ def automatic_pipeline(batch=700, offset=0):
     # if generate_data_for_questions(offset=offset, limit=300) > 0:
     #     return
 
-
     print('everything is done!')
     print('Just waiting...')
     from time import sleep
-    sleep(30*60)
+    sleep(30 * 60)
     exit()
 
 
 if __name__ == '__main__':
     print('Initializing...')
 
-    # automatic_pipeline(15)
-    # automatic_pipeline(300, offset=0)
     automatic_pipeline()
+    # automatic_pipeline(5)
+    # automatic_pipeline(300, offset=0)
 
     # add_concepts_from_list()
     # make_questions_sample(size=200)
@@ -1675,7 +1976,6 @@ if __name__ == '__main__':
     # measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION, skip=0)
     # measure_disk_usage_uploading_questions('c:/D/Work/YDev/CompPr/3stores/bench/bsbmtools-0.2/pc2815-1M.ttl')
     print('Bye.')
-
 
 '''
 

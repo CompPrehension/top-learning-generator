@@ -576,8 +576,8 @@ def makeQuestionGraph(way: Way, g, gl):
     if way.updates:
         for trov in way.updates.values():
             print('\t\tWriting updates ...')
-            print('\t\t', trov)
-            print()
+            # print('\t\t', trov)
+            # print()
             trov.write_as_triples(qg)
 
     return qg, cond_values, act_index
