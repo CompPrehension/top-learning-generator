@@ -1,11 +1,16 @@
 # sqlite_questions_metadata.py
 
 # note that path to sqlite file is hardcoded by classes generator
-from db_utils.sqlite_orm_classes import *
+if 1:
+    # control flow
+    from db_utils.sqlite_orm_classes_cf import *
+else:
+    # expression
+    from db_utils.sqlite_orm_classes import *
 
 
 # write to `_version` column to track data generated with older scripts
-TOOL_VERSION = 6
+TOOL_VERSION = 9
 
 # some enum-like constants
 STAGE_QT_FOUND = 0
@@ -30,18 +35,18 @@ def findQuestionOrTemplateByNameDB(name):
 def findQuestionsOnStageDB(stage=1, limit=None, version=None):
     query = Questions.select()
     if stage:
-	    query = query.where(Questions._stage == stage)
+        query = query.where(Questions._stage == stage)
     if version:
-	    query = query.where(Questions._version == version)
+        query = query.where(Questions._version == version)
     iterator = query.limit(limit).execute()
     return list(iterator)
 
 def findTemplatesOnStageDB(stage=1, limit=None, version=None):
     query = Templates.select()
     if stage:
-	    query = query.where(Templates._stage == stage)
+        query = query.where(Templates._stage == stage)
     if version:
-	    query = query.where(Templates._version == version)
+        query = query.where(Templates._version == version)
     iterator = query.limit(limit).execute()
     return list(iterator)
 
@@ -183,7 +188,7 @@ def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, u
 
 
 def names_to_bitmask(names: list[str], entity=Concepts):
-    '''gaters bits from records (creating new rows when not exist)'''
+    '''gather bits from records (creating new rows when not exist)'''
     bitmask = 0
     for obj in (create_or_update({'name': name}, entity=entity) for name in names):
         try:
@@ -192,5 +197,27 @@ def names_to_bitmask(names: list[str], entity=Concepts):
             raise AttributeError('No `bit` column in entity of type %s: $s' % (type(obj).__name__), str(obj.__data__))
         bitmask |= bit
     return bitmask
+
+
+# https://stackoverflow.com/a/8898977/12824563
+def bits_on(n):
+    ''' iterate over set bits (1's) in int, ascending order
+        ex. bits_on(109) --> 1 4 8 32 64
+    '''
+    while n:
+        b = n & (~n+1)
+        yield b
+        n ^= b
+
+
+def bitmask_to_names(bits: int, entity=Concepts) -> list[str]:
+    '''read bits from records (skipping values that not exist)'''
+    names = []
+    for bit in bits_on(bits):
+        try:
+            names.append( entity.get(entity.bit == bit).name )
+        except DoesNotExist:  # peewee.DoesNotExist
+            raise AttributeError('Not found entity of type %s with bit: $s' % (entity.__name__), str(bit))
+    return names
 
 
