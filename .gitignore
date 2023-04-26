@@ -6,6 +6,15 @@
 # Custom entries #
 _*old_code*.py
 
+*.log*
+tmp*
+
+*/question_gen/*.json
+*/question_gen/*.txt
+*/question_gen/*.xlsx
+*/question_gen/*/*.pdf
+*/question_gen/*/*.txt
+
 
 # User-specific files
 *.rsuser
