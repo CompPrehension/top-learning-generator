@@ -2,33 +2,32 @@
 
 """
     Entry point (main module) for question-creation service, a part of CompPrehension project.
-    @ 2022
+    @ 2023
 """
 
 import json
-from math import exp
 import math
 import random  # using random.seed
 import re
 import sys
+from math import exp
 from statistics import fmean as avg
 
 import fs
 import rdflib
-from rdflib import Graph, RDF
 import yaml
-
-from analyze_alg import generate_questions_for_algorithm, set_interrupt_flag
-from chain_utils import builder
-from GraphRole import GraphRole
-# from NamespaceUtil import NamespaceUtil
-from ns4guestions import *
-from rdflib_utils import graph_lookup, uploadGraph, get_class_descendants_rdf, get_leaf_classes_rdf
-from RemoteFileService import RemoteFileService
-from sparql_wrapper import Sparql
-from analyze_alg import jsObj
+from rdflib import Graph, RDF
 
 import sqlite_questions_metadata as dbmeta
+from GraphRole import GraphRole
+from RemoteFileService import RemoteFileService
+from analyze_alg import generate_questions_for_algorithm, set_interrupt_flag
+from analyze_alg import jsObj
+from chain_utils import builder
+# from NamespaceUtil import NamespaceUtil
+from ns4guestions import *
+from rdflib_utils import graph_lookup, get_class_descendants_rdf
+from sparql_wrapper import Sparql
 
 # from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, \
 #     createQuestionTemplateDB, createQuestionDB
@@ -46,7 +45,7 @@ from common_helpers import Checkpointer
 # using patched version of SPARQLBurger
 from SPARQLBurger.SPARQLQueryBuilder import *
 
-print('imports completed.')
+# print('imports completed.')
 
 # Global variables
 CONFIG = None
@@ -70,6 +69,10 @@ sparql_endpoint = None
 
 
 def read_access_config(file_path='./access_urls.yml'):
+    global CONFIG
+    if CONFIG:
+        return
+
     try:
         # read config
         with open(file_path) as f:
@@ -79,12 +82,11 @@ def read_access_config(file_path='./access_urls.yml'):
         print(e)
         exit(1)
 
-    global CONFIG
+    CONFIG = jsObj(data)
     global fuseki_host
     global rdf_db_name
     global FTP_BASE
     global FTP_DOWNLOAD_BASE
-    CONFIG = jsObj(data)
     fuseki_host = data["fuseki_host"]
     rdf_db_name = data["rdf_db_name"]
     FTP_BASE = data["ftp_base"]
@@ -128,9 +130,22 @@ def _get_rdfdb_stats_collectors():
     ]
 
 
-if INIT_GLOBALS:
+def get_file_service():
+    global fileService
+    if fileService:
+        return fileService
+
     read_access_config()
     fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
+    return fileService
+
+
+def get_endpoint():
+    global sparql_endpoint
+    if sparql_endpoint:
+        return sparql_endpoint
+
+    read_access_config()
     sparql_endpoint = Sparql(
         fuseki_host, rdf_db_name,
         query_url=CONFIG.query_url,
@@ -138,6 +153,13 @@ if INIT_GLOBALS:
         credentials=CONFIG.get('credentials'),
         post_update_hooks=_get_rdfdb_stats_collectors()
     )
+    return sparql_endpoint
+
+
+# if INIT_GLOBALS:
+#     read_access_config()
+#     get_file_service()
+#     get_endpoint()
 
     # See below:
     # qG = fetchGraph(qG_URI)
@@ -305,6 +327,9 @@ WHERE { GRAPH <%s> {
 
 
 def fetchGraph(gUri: str, verbose=False):
+
+    raise PendingDeprecationWarning('Do not use storage for RDF graphs any more !')
+
     format_request, format_parse = "turtle", 'n3'
     # format_request, format_parse = "rdfxml", None  # , 'application/rdf+xml'
     q = CONSTRUCT_PATTERN % gUri
@@ -324,52 +349,52 @@ def fetchGraph(gUri: str, verbose=False):
     return g
 
 
-# q_graph = fetchGraph(qG_URI)
-if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
-    ### empty graph:
-    # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
-    # pre-download whole questions graph
-    print('Pre-download whole questions graph ...')
-    if False:
-        pass;  # qUri = qG_URI
-    else:
-        ## qUri = 'http://vstu.ru/poas/questions_only'
-        # qUri = 'http://vstu.ru/poas/selected_questions'
-        # ! qG_URI !
-        print('Fetching graph as specified:', qG_URI)
-    qG = fetchGraph(qG_URI, verbose=True)
-
-    if DUMP_QUESTION_GRAPH_TO_FILE:
-        ###
-        # dump_qG_to = CONFIG.ftp_base + CONFIG.rdf_db_name + '.ttl'
-        dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
-
-        if REMOVE_TRIPLES_FOR_PRODUCTION:
-            # just remove unused properties (has_graph_*) from question nodes
-            # before exporting to production env
-            nsQ = 'http://vstu.ru/poas/questions/'
-            prop_names = '''
-            has_graph_q_s
-            has_graph_q
-            has_graph_qt
-            has_graph_qt_s'''.split()
-
-            i = 0
-            for pn in prop_names:
-                p = rdflib.URIRef(pn, nsQ)
-                for s, o in qG.subject_objects(p):
-                    qG.remove((s, p, o))
-                    i += 1
-            print("Removed %d triples from graph (for production)." % i)
-
-        # shorten length of serialized data
-        qG.bind('Q', 'http://vstu.ru/poas/questions/Question#')
-        qG.bind('QT', 'http://vstu.ru/poas/questions/QuestionTemplate#')
-        qG.bind('qs', 'http://vstu.ru/poas/questions/')
-        qG.serialize(dump_qG_to, format='turtle')
-        print(len(qG), f"triples saved to file: {dump_qG_to}")
-        print('Bye for now!')
-        exit()
+    # # q_graph = fetchGraph(qG_URI)
+    # if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
+    #     ### empty graph:
+    #     # qG = Graph().parse(format='n3', data='@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .\n[] a rdf:Class .')
+    #     # pre-download whole questions graph
+    #     print('Pre-download whole questions graph ...')
+    #     if False:
+    #         pass;  # qUri = qG_URI
+    #     else:
+    #         ## qUri = 'http://vstu.ru/poas/questions_only'
+    #         # qUri = 'http://vstu.ru/poas/selected_questions'
+    #         # ! qG_URI !
+    #         print('Fetching graph as specified:', qG_URI)
+    #     qG = fetchGraph(qG_URI, verbose=True)
+    #
+    #     if DUMP_QUESTION_GRAPH_TO_FILE:
+    #         ###
+    #         # dump_qG_to = CONFIG.ftp_base + CONFIG.rdf_db_name + '.ttl'
+    #         dump_qG_to = CONFIG.ftp_base + '../' + CONFIG.rdf_db_name + '.ttl'
+    #
+    #         if REMOVE_TRIPLES_FOR_PRODUCTION:
+    #             # just remove unused properties (has_graph_*) from question nodes
+    #             # before exporting to production env
+    #             nsQ = 'http://vstu.ru/poas/questions/'
+    #             prop_names = '''
+    #             has_graph_q_s
+    #             has_graph_q
+    #             has_graph_qt
+    #             has_graph_qt_s'''.split()
+    #
+    #             i = 0
+    #             for pn in prop_names:
+    #                 p = rdflib.URIRef(pn, nsQ)
+    #                 for s, o in qG.subject_objects(p):
+    #                     qG.remove((s, p, o))
+    #                     i += 1
+    #             print("Removed %d triples from graph (for production)." % i)
+    #
+    #         # shorten length of serialized data
+    #         qG.bind('Q', 'http://vstu.ru/poas/questions/Question#')
+    #         qG.bind('QT', 'http://vstu.ru/poas/questions/QuestionTemplate#')
+    #         qG.bind('qs', 'http://vstu.ru/poas/questions/')
+    #         qG.serialize(dump_qG_to, format='turtle')
+    #         print(len(qG), f"triples saved to file: {dump_qG_to}")
+    #         print('Bye for now!')
+    #         exit()
 
 
 # def getFullTemplate(name):
@@ -614,7 +639,7 @@ def solve_templates(limit=None) -> int:
         try:
             m = solve_template_with_jena(m, verbose=True)
         except Exception:
-            print(f'error with "{qt.name}"')
+            print(f'error with template "{qt.name}"')
             # raise
             continue
 
@@ -632,13 +657,16 @@ def solve_templates(limit=None) -> int:
 __PATCH_TTL_RE = None
 
 
-def _patch_and_parse_ttl(opened_file):
+def _patch_and_parse_ttl(file_data):
     global __PATCH_TTL_RE
     if not __PATCH_TTL_RE:
         __PATCH_TTL_RE = re.compile(r'((?<=:return)|(?<=:break)|(?<=:continue))(\s+:stmt)')
 
-    data = opened_file.read()
-    data = __PATCH_TTL_RE.sub(lambda m: m[1] + ',' + m[2], data)  # insert ,
+    data = __PATCH_TTL_RE.sub(lambda m: m[1] + ',' + m[2], file_data)  # insert ,
+    # check if it is changed
+    if data != file_data:
+        print('DEBUG: TTL data was patched effectively.')
+
     g = Graph().parse(format='ttl', data=data.encode())
     return g
 
@@ -665,7 +693,7 @@ def load_templates(limit=None) -> int:
 
         path = CONFIG.src_ttl_dir + qt.src_path
         with open(path) as f:
-            m = _patch_and_parse_ttl(f)
+            m = _patch_and_parse_ttl(f.read())
 
         try:
             random.seed(hash(qt.name))  # make what random produces stable
@@ -837,6 +865,7 @@ def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3 * 1024, 40 * 
 
 
 def createQuestionTemplate(questionTemplateName) -> 'question template URI':
+    """Deprecated."""
     global qG
     if qG is None:
         # fetch it once as template data is needed only
@@ -1329,7 +1358,7 @@ def _trace_features(g, gl, q, quiet=False):
                 loop_to_iterations_entered[loop_st] += 1
 
         else:
-        # elif (act_inst, RDF.type, act_end) in g:
+            # elif (act_inst, RDF.type, act_end) in g:
             # cond value
             if (act_value := g.value(act_inst, expr_value, None)) is not None:
                 bool_value = act_value.toPython()
@@ -1401,6 +1430,7 @@ MAX_ACTIONS_COUNT = 20
 
 
 def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY):
+    """Create questions from template"""
     qtname = qt if isinstance(qt, str) else qt.name
 
     # g = getQuestionModel(qtname, GraphRole.QUESTION_TEMPLATE_SOLVED)
@@ -1470,13 +1500,13 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
 
             actions_count = metrics['actions_count']
             if actions_count > MAX_ACTIONS_COUNT:
-                print(f'-x- Cannot take this question: actions_count = {actions_count} <= {MAX_ACTIONS_COUNT}')
+                print(f'-x- Cannot take this question: actions_count = {actions_count} > max of {MAX_ACTIONS_COUNT}')
                 continue
 
             complexity = metrics['integral_complexity']
             low, high = clamp_complexity
             if not (low <= complexity <= high):
-                print(f'-x- Cannot take this question: {low} <= {complexity} <= {high}')
+                print(f'-x- Cannot take this question: {complexity} is not within [{low} , {high}]')
                 continue
 
         suffix = question['name_suffix'] or ('_nocond_q%d' % questions_counter)
@@ -1858,11 +1888,7 @@ where {  GRAPH <http://vstu.ru/poas/questions> {
 }}'''
     # insert_concept_query % (comma-separated double-quoted strings, template name)
 
-    if not sparql_endpoint:
-        read_access_config()
-        _sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
-    else:
-        _sparql_endpoint = sparql_endpoint
+    _sparql_endpoint = get_endpoint()
 
     print(len(tasks), 'questions templates to update, starting ...')
     ###
@@ -1895,11 +1921,7 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions',
     ''' Copy a sample of questions with templates from src named graph to dest named graph keeping all the range of available complexity '''
     import random
 
-    if not INIT_GLOBALS:
-        # if not sparql_endpoint:
-        read_access_config()
-        #### fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
+    sparql_endpoint = get_endpoint()
 
     # select all values from src_graph first
     select_all_questions = '''SELECT ?q ?complexity
@@ -1959,17 +1981,12 @@ def make_questions_sample(src_graph='http://vstu.ru/poas/questions',
 
 def archive_required_files(src_graph='http://vstu.ru/poas/selected_questions',
                            target_zip='./selected_questions-files.zip'):
-    import fs
     import fs.copy
     from fs import open_fs
     from fs.zipfs import WriteZipFS
     import zipfile
 
-    if not INIT_GLOBALS:
-        # if not sparql_endpoint:
-        read_access_config()
-        # fileService = RemoteFileService(FTP_BASE, FTP_DOWNLOAD_BASE)
-        sparql_endpoint = Sparql(fuseki_host, rdf_db_name, )
+    sparql_endpoint = get_endpoint()
 
     # <http://vstu.ru/poas/questions/has_graph_qt_s>
     # select all values from src_graph first
@@ -2110,17 +2127,17 @@ def measure_disk_usage_uploading_named_graphs(target_role=GraphRole.QUESTION_TEM
 
 
 def automatic_pipeline(batch=700, offset=0):
-    # if load_templates(limit=batch) > 20:  # note 14 errors
-    #     return
+    if load_templates(limit=batch) > 20:  # note 14 errors
+        return
 
-    # if update_template_concepts(limit=batch) > 0:
-    #     return
+    if update_template_concepts(limit=batch) > 0:
+        return
 
-    # if solve_templates(limit=None) > 0:
-    #     return
+    if solve_templates(limit=None) > 0:
+        return
 
-    # if generate_questions_for_templates(limit=batch) > 0:
-    #     return
+    if generate_questions_for_templates(limit=batch) > 0:
+        return
 
     # if update_questions_trace_concepts(limit=700) > 0:
     #     return
@@ -2140,7 +2157,7 @@ def automatic_pipeline(batch=700, offset=0):
 if __name__ == '__main__':
     print('Initializing...')
 
-    automatic_pipeline()
+    # automatic_pipeline()
     # automatic_pipeline(5)
     # automatic_pipeline(300, offset=0)
 

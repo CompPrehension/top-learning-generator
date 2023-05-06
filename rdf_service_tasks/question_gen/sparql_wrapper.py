@@ -1,7 +1,7 @@
 # sparql_wrapper.py
 
 '''
-Class that incapsulates acees to sparql endpoint
+Class that encapsulates access to sparql endpoint
 (Apache Jena Fuseki in this case)
 '''
 
