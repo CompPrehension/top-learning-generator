@@ -9,8 +9,10 @@ src_ttl_dir: "c:/Temp2/cf_v9-expr-concepts/__result"
 
 fuseki_host: null
 rdf_db_name: cf_pi
-query_url:  "http://localhost:7200/repositories/cf_pi"
-update_url: "http://localhost:7200/repositories/cf_pi/statements"
+query_url:  null
+update_url: null
+# query_url:  "http://localhost:7200/repositories/cf_pi"
+# update_url: "http://localhost:7200/repositories/cf_pi/statements"
 
 
 ###  Triple stores  ###

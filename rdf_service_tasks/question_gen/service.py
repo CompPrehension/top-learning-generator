@@ -90,7 +90,8 @@ def read_access_config(file_path='./access_urls.yml'):
     fuseki_host = data["fuseki_host"]
     rdf_db_name = data["rdf_db_name"]
     FTP_BASE = data["ftp_base"]
-    FTP_DOWNLOAD_BASE = data["ftp_download_base"]
+    FTP_DOWNLOAD_BASE = data["ftp_download_base"] or FTP_BASE
+    return CONFIG
 
 
 def _get_rdfdb_stats_collectors():
@@ -130,7 +131,7 @@ def _get_rdfdb_stats_collectors():
     ]
 
 
-def get_file_service():
+def get_file_service() -> RemoteFileService:
     global fileService
     if fileService:
         return fileService
@@ -161,8 +162,8 @@ def get_endpoint():
 #     get_file_service()
 #     get_endpoint()
 
-    # See below:
-    # qG = fetchGraph(qG_URI)
+# See below:
+# qG = fetchGraph(qG_URI)
 
 
 def makeUpdateTripleQuery(ng, s, p, o, prefixes=()):
@@ -327,7 +328,6 @@ WHERE { GRAPH <%s> {
 
 
 def fetchGraph(gUri: str, verbose=False):
-
     raise PendingDeprecationWarning('Do not use storage for RDF graphs any more !')
 
     format_request, format_parse = "turtle", 'n3'
@@ -347,7 +347,6 @@ def fetchGraph(gUri: str, verbose=False):
         g = query_result
     if verbose: ch.since_start('fetchGraph: done in:')
     return g
-
 
     # # q_graph = fetchGraph(qG_URI)
     # if INIT_GLOBALS and PREFETCH_QUESTIONS and not qG:
@@ -427,7 +426,7 @@ def findQuestionByName(questionName, questions_graph=qG):
     return None;
 
 
-def nameForQuestionGraph(questionName, role: GraphRole, questions_graph=qG, file_ext=".ttl", fileService=fileService):
+def nameForQuestionGraph(questionName, role: GraphRole, questions_graph=qG, file_ext=".ttl", fileService=get_file_service()):
     # look for <Question>-<subgraph> relation in metadata first
     qG = questions_graph or fetchGraph(qG_URI);
     targetGraphUri = None
@@ -452,19 +451,19 @@ def nameForQuestionGraph(questionName, role: GraphRole, questions_graph=qG, file
     return fileService.prepareNameForFile(role.ns().get(questionName + file_ext), False);
 
 
-def getSubpathForQuestionGraph(name, role: GraphRole, file_ext=".ttl", fileService=fileService):
+def getSubpathForQuestionGraph(name, role: GraphRole, file_ext=".ttl", fileService=get_file_service()):
     file_path = role.ns().get(name)
     if not file_path.endswith(file_ext):
         file_path += file_ext
     return fileService.prepareNameForFile(file_path);
 
 
-def getQuestionSubgraph(questionName, role, fileService=fileService):
+def getQuestionSubgraph(questionName, role, fileService=get_file_service()):
     return fileService.fetchModel(nameForQuestionGraph(questionName, role));
 
 
 def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, subgraph_name=None,
-                        fileService=fileService):
+                        fileService=get_file_service()):
     qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     if model:
         fileService.sendModel(qgUri, model);
@@ -506,7 +505,7 @@ def setQuestionSubgraph(questionName, role, model: Graph, questionNode=None, sub
         print('      SPARQL: insert concepts query response-code:', res.response.code)
 
 
-def setQuestionSubgraphDB(row_instance, role, new_stage: int, model: Graph, subgraph_path=None, fileService=fileService,
+def setQuestionSubgraphDB(row_instance, role, new_stage: int, model: Graph, subgraph_path=None, fileService=get_file_service(),
                           _debug_path_suffix=None):
     # qgUri = subgraph_name or nameForQuestionGraph(questionName, role)
     file_subpath = subgraph_path or getSubpathForQuestionGraph(row_instance.name, role)
@@ -539,7 +538,7 @@ def extract_graph_values(model: Graph, subject: rdflib.URIRef = None, predicate:
     return [o.toPython() for o in objs]
 
 
-def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
+def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileService=get_file_service()):
     if topRole.ordinal() >= GraphRole.QUESTION.ordinal() and (pos := questionName.rfind('_v')) > 0:
         # cut values added to template name
         qt_name = questionName[:pos]
@@ -552,14 +551,14 @@ def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileServic
             graph_name = questionName
         else:
             graph_name = qt_name
-        gm = getQuestionSubgraph(graph_name, role, fileService=fileService);
+        gm = getQuestionSubgraph(graph_name, role, fileService=get_file_service());
         if gm:
             m += gm;
         if (role == topRole): break;
     return m
 
 
-def getQuestionModelDB(qt_or_q, topRole=GraphRole.QUESTION_SOLVED, fileService=fileService):
+def getQuestionModelDB(qt_or_q, topRole=GraphRole.QUESTION_SOLVED, fileService=get_file_service()):
     if topRole.ordinal() >= GraphRole.QUESTION.ordinal() and isinstance(qt_or_q, dbmeta.Questions):
         qt = qt_or_q.template
         q = qt_or_q
@@ -696,7 +695,7 @@ def load_templates(limit=None) -> int:
             m = _patch_and_parse_ttl(f.read())
 
         try:
-            random.seed(hash(qt.name))  # make what random produces stable
+            random.seed(hash(qt.name))  # make random stable
             m = repair_statements_in_graph(m)
         except AssertionError:
             print(f'error with "{qt.name}"')
@@ -719,6 +718,9 @@ def load_templates(limit=None) -> int:
 
 
 def play_extracting_concepts(g: rdflib.Graph):
+
+    raise DeprecationWarning("obsolete");
+
     gl = graph_lookup(g, PREFIXES)
     data = {}
     ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item') | gl(':body'))  ##  * '+'
@@ -756,6 +758,9 @@ def play_extracting_concepts(g: rdflib.Graph):
 def update_template_concepts(limit=None) -> int:
     """ get action types from rdf data
     """
+
+    raise DeprecationWarning("obsolete");
+
     schema = ctrl_flow_schema()
     action_classes = get_class_descendants_rdf(
         rdflib.URIRef(NS_code.get("action")), schema
@@ -1089,7 +1094,7 @@ def question_metrics(g, gl, question_dict, quiet=False):
 
     ppath = ((gl(':body') | gl(':branches_item')) * '?' / gl(':body_item'))  ##  * '+'
 
-    # nesting_depth
+    # nesting_depth  (0 = 1 level, 1 = 2 levels)
     def action_depth(s):
         children = g.objects(s, ppath)
         return 1 + max([0, *map(action_depth, children)])
@@ -1098,7 +1103,7 @@ def question_metrics(g, gl, question_dict, quiet=False):
     max_depth = action_depth(root) - 1
     data['nesting_depth'] = max_depth
 
-    # find max loop nesting depth (1 = 1 loop, 1 = 2 loops, one in other)
+    # find max loop nesting depth (1 = 1 loop, 1 = 2 loops, one in another)
 
     # query = 'SELECT ?s where {?s a :loop}'
     # r = g.query(query, initNs=PREFIXES)
@@ -1424,8 +1429,8 @@ import threading
 CREATE_TRACES_TIMEOUT = 15  # seconds
 
 # CLAMP_COMPLEXITY = (0.1, 0.6)
-# CLAMP_COMPLEXITY = (0.1, 0.8)
-CLAMP_COMPLEXITY = (0.5, 1.0)
+CLAMP_COMPLEXITY = (0.1, 0.8)
+# CLAMP_COMPLEXITY = (0.5, 1.0)
 MAX_ACTIONS_COUNT = 20
 
 
@@ -1481,7 +1486,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
         return 0
 
     seen_names = set()
-    used_questions = 0
+    saved_questions = []
 
     for question in questions:
         if question['name_suffix'] in seen_names:
@@ -1491,12 +1496,12 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
         print()
         metrics = question_metrics(g, gl, question)
         if clamp_complexity:
-            ### !!! Get only ones with 'true' values !!! ###
             name_suffix = question['name_suffix']
-            if '1' not in name_suffix:
-                print(f'-x- Skip this question: name_suffix = {name_suffix} has no "true"')
-                continue
             print(f"    name_suffix = {name_suffix}")
+            # ### !!! Get only ones with 'true' values !!! ###
+            # if '1' not in name_suffix:
+            #     print(f'-x- Skip this question: name_suffix = {name_suffix} has no "true"')
+            #     continue
 
             actions_count = metrics['actions_count']
             if actions_count > MAX_ACTIONS_COUNT:
@@ -1529,14 +1534,14 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
             except:
                 continue
 
-        dbmeta.createQuestionDB(question_name, qt, q_graph=file_path, metrics=metrics)
-        used_questions += 1
+        new_q = dbmeta.createQuestionDB(question_name, qt, q_graph=file_path, metrics=metrics)
+        saved_questions.append(new_q)
 
         # gUri = NS_file.get(file_path)
         # qUri = createQuestion(question_name, qtname, gUri, metrics)
         # print("  Question URI:", qUri)
 
-    return used_questions
+    return saved_questions
 
 
 def generate_questions_for_templates(offset=None, limit=None):
@@ -1589,7 +1594,7 @@ def generate_questions_for_templates(offset=None, limit=None):
             continue
         try:
             questions_made = process_template(qt, questions_count)
-            questions_count += questions_made
+            questions_count += len(questions_made)
             templates_used += 1
             # set even if no questions made, to avoid trying it next time
             qt._stage = dbmeta.STAGE_QT_USED
@@ -1614,8 +1619,8 @@ def generate_questions_for_templates(offset=None, limit=None):
     return questions_count
 
 
-def generate_data_for_question(q_row_instance):
-    ''' generating data for question '''
+def generate_data_for_question(q_row_instance) -> 'q_row or None':
+    """ generating data for question """
     q = q_row_instance
     qname = q.name
     g = getQuestionModelDB(q, GraphRole.QUESTION)
@@ -1636,6 +1641,32 @@ def generate_data_for_question(q_row_instance):
     try:
         q_dict = make_question_dict_for_alg_json(alg_json, qname)
 
+        # fill metadata (CompP format) for the question
+        metadata = dict(
+            name = q.name,
+            domain_shortname = 'control_flow',
+            template_id = template.id,
+            qt_graph = None,
+            qt_s_graph = None,
+            q_graph = None,
+            q_s_graph = None,
+            q_data_graph = q_data_graph,
+            tag_bits = q.tag_bits,
+            concept_bits = q.concept_bits,
+            law_bits = q.law_bits,
+            violation_bits = q.violation_bits,
+            trace_concept_bits = q.trace_concept_bits,
+            solution_structural_complexity = q.solution_structural_complexity,
+            integral_complexity = q.integral_complexity,
+            solution_steps = q.solution_steps,
+            distinct_errors_count = q.distinct_errors_count,
+            _stage = q._stage,
+            _version = q._version,
+        )
+        q_dict['metadata'] = metadata
+        q_dict['questionData']['options']['metadata'] = metadata
+
+
         # fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
         file_subpath = getSubpathForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
 
@@ -1649,7 +1680,7 @@ def generate_data_for_question(q_row_instance):
         setQuestionSubgraphDB(q, GraphRole.QUESTION_DATA, dbmeta.STAGE_Q_DATA_SAVED, model=None,
                               subgraph_path=file_subpath)
 
-        return 1
+        return q
     except Exception as e:
         print("exception in generate_data_for_question:")
         print(e)
@@ -1657,7 +1688,7 @@ def generate_data_for_question(q_row_instance):
         # raise
         q._stage += 10  # mark the error
         q.save()
-        return 0
+        return None
 
 
 def generate_data_for_questions(offset=None, limit=None):
@@ -1683,7 +1714,8 @@ def generate_data_for_questions(offset=None, limit=None):
         print("    (with errors so far: %d)" % skip_count)
         print("========")
         try:
-            n = generate_data_for_question(q)
+            q = generate_data_for_question(q)
+            n = 1 if q else 0
             questions_count += n
             skip_count += not n
         except (NotImplementedError, AssertionError) as e:
@@ -1703,6 +1735,9 @@ def generate_data_for_questions(offset=None, limit=None):
 
 
 def update_questions_trace_concepts(limit=None):
+
+    raise DeprecationWarning("obsolete");
+
     print("Requesting not updated questions ...", flush=True)
 
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
@@ -1766,6 +1801,7 @@ def update_questions_trace_concepts(limit=None):
 
 
 def update_questions_trace_features(limit=None):
+    """Update trace_features_json column with trace features calculated from question data where not set"""
     print("Requesting not updated questions ...", flush=True)
 
     # questions_to_process = unsolvedQuestions(GraphRole.QUESTION_DATA)
@@ -1798,13 +1834,13 @@ def update_questions_trace_features(limit=None):
         print()
         print("Updating question: ", qname, "(i: %d)" % (questions_count + skip_count))
         try:
-            ###
-            qf_str = q.trace_features_json
-            if '"max_if_branches_entered": 0' in qf_str:
-                q._version = dbmeta.TOOL_VERSION
-                q.save()
-                questions_count += 1
-                continue
+            # ###
+            # qf_str = q.trace_features_json
+            # if '"max_if_branches_entered": 0' in qf_str:
+            #     q._version = dbmeta.TOOL_VERSION
+            #     q.save()
+            #     questions_count += 1
+            #     continue
 
             trace_features_json = {'flags': {}, 'numeric': {}}
 
@@ -1863,14 +1899,9 @@ def make_questions__main():
         # qtname = 'packet_queue_get'
         qtname = 'SDL_CondWaitTimeout'
         print("========", flush=True)
-        questions_count = process_template(qtname)
+        questions_count = len(process_template(qtname))
         print()
         print(questions_count, 'questions created for template.')
-
-    '''
-    Templates without questions found: 24  (of 1 315)
-    [Finished in 39.5s]
-    '''
 
 
 def add_concepts_from_list(file_path='new_types_assigned.txt'):
@@ -2130,8 +2161,9 @@ def automatic_pipeline(batch=700, offset=0):
     if load_templates(limit=batch) > 20:  # note 14 errors
         return
 
-    if update_template_concepts(limit=batch) > 0:
-        return
+    # obsolete, TODO: remove func
+    # if update_template_concepts(limit=batch) > 0:
+    #     return
 
     if solve_templates(limit=None) > 0:
         return
@@ -2139,10 +2171,12 @@ def automatic_pipeline(batch=700, offset=0):
     if generate_questions_for_templates(limit=batch) > 0:
         return
 
+    # obsolete, TODO: remove func
     # if update_questions_trace_concepts(limit=700) > 0:
     #     return
-    if update_questions_trace_features(limit=6000) > 0:
-        return
+    # obsolete, TODO: remove func
+    # if update_questions_trace_features(limit=6000) > 0:
+    #     return
 
     # if generate_data_for_questions(offset=offset, limit=300) > 0:
     #     return

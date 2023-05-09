@@ -115,7 +115,9 @@ def repair_statements_in_graph(g, gl=None):
 
 
 def convert_graph_to_json(g, remove_acts_bounds=True):
-    'Before conversion to JSON: save act values to alg nodes as `cond_values_hint`, and (if requested) remove acts & boundaries.'
+    """Before conversion to JSON:
+        save act values to alg nodes as `cond_values_hint`,
+        and (if requested) remove acts & boundaries."""
 
     patch_graph(g)
 

@@ -51,7 +51,6 @@ def findTemplatesOnStageDB(stage=1, limit=None, version=None):
     return list(iterator)
 
 
-
 def createQuestionTemplateDB(questionTemplateName, src_file_path=None) -> 'question template instance':
 
     qt = Templates.get_or_none(Templates.name == questionTemplateName)
@@ -91,6 +90,7 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
         q = Questions.create(**{
             'name': questionName,
             'template': template,
+            'origin': template.origin or "",  # copy origin
             'q_graph': q_graph,
             '_stage': STAGE_Q_CREATED,
             '_version': TOOL_VERSION,
