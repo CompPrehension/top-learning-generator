@@ -14,8 +14,6 @@ import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.springframework.web.util.HtmlUtils;
 import org.vstu.compprehension.Service.LocalizationService;
 import org.vstu.compprehension.common.StringHelper;
@@ -24,6 +22,8 @@ import org.vstu.compprehension.models.businesslogic.backend.JenaBackend;
 import org.vstu.compprehension.models.businesslogic.backend.facts.Fact;
 import org.vstu.compprehension.models.businesslogic.domains.helpers.FactsGraph;
 import org.vstu.compprehension.models.businesslogic.storage.AbstractRdfStorage;
+import org.vstu.compprehension.models.businesslogic.storage.LocalRdfStorage;
+import org.vstu.compprehension.models.businesslogic.storage.QuestionMetadataManager;
 import org.vstu.compprehension.models.entities.*;
 import org.vstu.compprehension.models.entities.EnumData.FeedbackType;
 import org.vstu.compprehension.models.entities.EnumData.Language;
@@ -31,14 +31,11 @@ import org.vstu.compprehension.models.entities.EnumData.QuestionType;
 import org.vstu.compprehension.models.entities.EnumData.SearchDirections;
 import org.vstu.compprehension.models.entities.QuestionOptions.*;
 import org.vstu.compprehension.models.entities.exercise.ExerciseEntity;
-import org.vstu.compprehension.models.repository.DomainRepository;
-import org.vstu.compprehension.models.repository.QuestionMetadataBaseRepository;
-import org.vstu.compprehension.models.repository.QuestionRequestLogRepository;
+import org.vstu.compprehension.models.repository.QuestionMetadataRepository;
 import org.vstu.compprehension.utils.ExpressionSituationPythonCaller;
 import org.vstu.compprehension.utils.HyperText;
 import org.vstu.compprehension.utils.RandomProvider;
 
-import javax.inject.Singleton;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -49,8 +46,7 @@ import java.util.stream.Stream;
 import static java.lang.Math.max;
 import static java.lang.Math.random;
 
-@Component @Log4j2
-@Singleton
+@Log4j2
 public class ProgrammingLanguageExpressionDomain extends Domain {
     static final String EVALUATION_ORDER_QUESTION_TYPE = "OrderOperators";
     static final String EVALUATION_ORDER_SUPPLEMENTARY_QUESTION_TYPE = "OrderOperatorsSupplementary";
@@ -70,60 +66,24 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
 
     public static final String END_EVALUATION = "student_end_evaluation";
     private final LocalizationService localizationService;
-    private final QuestionMetadataBaseRepository exprQuestionMetadataRepository;
 
-    @Autowired
-    public ProgrammingLanguageExpressionDomain(LocalizationService localizationService,
-                                               DomainRepository domainRepository,
-                                               RandomProvider randomProvider,
-                                               QuestionMetadataBaseRepository exprQuestionMetadataRepository,
-         QuestionRequestLogRepository questionRequestLogRepository) {
-        super(randomProvider, questionRequestLogRepository);
+    public ProgrammingLanguageExpressionDomain(
+            DomainEntity domainEntity,
+            LocalizationService localizationService,
+            RandomProvider randomProvider,
+            QuestionMetadataRepository questionMetadataRepository) {
+
+        super(domainEntity, randomProvider);
+
         this.localizationService = localizationService;
-        this.exprQuestionMetadataRepository = exprQuestionMetadataRepository;
-
-        name = "ProgrammingLanguageExpressionDomain";
-        domainEntity = domainRepository.findById(getDomainId()).orElseThrow();
+        this.rdfStorage = new LocalRdfStorage(
+                domainEntity, questionMetadataRepository, new QuestionMetadataManager(this, questionMetadataRepository));
 
         fillTags();
         fillConcepts();
         readLaws(this.getClass().getClassLoader().getResourceAsStream(LAWS_CONFIG_PATH));
         readSupplementaryConfig(this.getClass().getClassLoader().getResourceAsStream(SUPPLEMENTARY_CONFIG_PATH));
     }
-
-    private ProgrammingLanguageExpressionDomain(LocalizationService localizationService) {
-        super(new RandomProvider(), null);
-        this.localizationService = localizationService;
-        exprQuestionMetadataRepository = null;
-
-        name = "ProgrammingLanguageExpressionDomain";
-        // domainEntity = null;
-        domainEntity = new DomainEntity();
-        domainEntity.setOptions(new DomainOptionsEntity());
-
-        fillTags();
-        fillConcepts();
-        readLaws(this.getClass().getClassLoader().getResourceAsStream(LAWS_CONFIG_PATH));
-        readSupplementaryConfig(this.getClass().getClassLoader().getResourceAsStream(SUPPLEMENTARY_CONFIG_PATH));
-        // using update() as init
-        // OFF: // update();
-    }
-    //Hacked version. don't use in production, only for develop
-    public static ProgrammingLanguageExpressionDomain makeHackedDomain() {
-        return new ProgrammingLanguageExpressionDomain(new LocalizationService());
-    }
-
-    @Override
-    public String getShortName() {
-        return "expression";
-    }
-
-    @NotNull
-    @Override
-    public String getDomainId() {
-        return "ProgrammingLanguageExpressionDomain";
-    }
-
 
     private void fillTags() {
         tags = new HashMap<>();
@@ -381,12 +341,6 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
         // init questions storage
         getRdfStorage();
     }
-
-    @Override
-    public QuestionMetadataBaseRepository getQuestionMetadataRepository() {
-        return exprQuestionMetadataRepository;
-    }
-
 
     @Override
     public Question parseQuestionTemplate(InputStream stream) {
@@ -649,14 +603,13 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
             try {
                 // new version - invoke rdfStorage search
                 questionRequest = fillBitmasksInQuestionRequest(questionRequest);
-                saveQuestionRequest(questionRequest);
-                foundQuestions = getRdfStorage().searchQuestions(questionRequest, 1);
+                foundQuestions = getRdfStorage().searchQuestions(this, questionRequest, 1);
 
                 // search again if nothing found with "TO_COMPLEX"
                 SearchDirections lawsSearchDir = questionRequest.getLawsSearchDirection();
                 if (foundQuestions.isEmpty() && lawsSearchDir == SearchDirections.TO_COMPLEX) {
                     questionRequest.setLawsSearchDirection(SearchDirections.TO_SIMPLE);
-                    foundQuestions = getRdfStorage().searchQuestions(questionRequest, 1);
+                    foundQuestions = getRdfStorage().searchQuestions(this, questionRequest, 1);
                 }
             } catch (RuntimeException ex) {
                 // file storage was not configured properly...
@@ -938,7 +891,7 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
     }
 
 //    @Override
-//    public QuestionMetadataBaseRepository getQuestionMetadataRepository() {
+//    public QuestionMetadataRepository getQuestionMetadataRepository() {
 //        return null;
 //    }
 
@@ -2552,9 +2505,9 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
             entity.setOptions(new OrderQuestionOptionsEntity());
         }
 
-        QuestionMetadataDraftEntity meta = rs.findQuestionByName(questionName);
+        QuestionMetadataEntity meta = rs.findQuestionByName(questionName);
         if (meta == null) {
-            meta = rs.createQuestion(questionName, questionName.split("_v")[0], false);
+            meta = rs.createQuestion(this, questionName, questionName.split("_v")[0], false);
         }
         // QuestionMetadataEntity metadata = entity.getOptions().getMetadata();
         // // entity.getOptions().setMetadata(metadata); // see below
@@ -2776,7 +2729,7 @@ public class ProgrammingLanguageExpressionDomain extends Domain {
         return name2bit;
     }
     private HashMap<String, Long> _getLawsName2bit() {
-        HashMap<String, Long> name2bit = new HashMap<>(16);
+        HashMap<String, Long> name2bit = new HashMap<>(8);
         name2bit.put("single_token_binary_execution", 0x1L);  	// (1)
         name2bit.put("two_token_binary_execution", 0x2L);  	// (2)
         name2bit.put("single_token_unary_prefix_execution", 0x4L);  	// (4)

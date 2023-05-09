@@ -15,13 +15,13 @@ import org.apache.jena.vocabulary.RDF;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.opentest4j.AssertionFailedError;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.vstu.compprehension.Service.LocalizationService;
 import org.vstu.compprehension.models.businesslogic.*;
 import org.vstu.compprehension.models.businesslogic.backend.facts.Fact;
 import org.vstu.compprehension.models.businesslogic.backend.facts.JenaFactList;
 import org.vstu.compprehension.models.businesslogic.domains.helpers.FactsGraph;
+import org.vstu.compprehension.models.businesslogic.storage.LocalRdfStorage;
+import org.vstu.compprehension.models.businesslogic.storage.QuestionMetadataManager;
 import org.vstu.compprehension.models.entities.*;
 import org.vstu.compprehension.models.entities.EnumData.FeedbackType;
 import org.vstu.compprehension.models.entities.EnumData.Language;
@@ -30,14 +30,11 @@ import org.vstu.compprehension.models.entities.QuestionOptions.MatchingQuestionO
 import org.vstu.compprehension.models.entities.QuestionOptions.OrderQuestionOptionsEntity;
 import org.vstu.compprehension.models.entities.QuestionOptions.QuestionOptionsEntity;
 import org.vstu.compprehension.models.entities.exercise.ExerciseEntity;
-import org.vstu.compprehension.models.repository.DomainRepository;
-import org.vstu.compprehension.models.repository.QuestionMetadataBaseRepository;
-import org.vstu.compprehension.models.repository.QuestionRequestLogRepository;
+import org.vstu.compprehension.models.repository.*;
 import org.vstu.compprehension.utils.ApplicationContextProvider;
 import org.vstu.compprehension.utils.HyperText;
 import org.vstu.compprehension.utils.RandomProvider;
 
-import javax.inject.Singleton;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -52,9 +49,7 @@ import static org.apache.jena.ontology.OntModelSpec.OWL_MEM;
 import static org.vstu.compprehension.models.businesslogic.domains.DomainVocabulary.retainLeafOntClasses;
 import static org.vstu.compprehension.models.businesslogic.domains.DomainVocabulary.testSubClassOfTransitive;
 import static org.vstu.compprehension.models.businesslogic.domains.helpers.FactsGraph.factsListDeepCopy;
-
-@Component @Log4j2
-@Singleton
+@Log4j2
 public class ControlFlowStatementsDomain extends Domain {
     public static final String LOCALE_KEY_MARK = "!{locale:";
     static final String RESOURCES_LOCATION = "org/vstu/compprehension/models/businesslogic/domains/";
@@ -80,30 +75,22 @@ public class ControlFlowStatementsDomain extends Domain {
     private static List<String> fieldPropertiesCache = null;
 
     private final LocalizationService localizationService;
-    private final QuestionMetadataBaseRepository ctrlFlowQuestionMetadataRepository;
 
-    @Autowired
-    public ControlFlowStatementsDomain(LocalizationService localizationService,
-         DomainRepository domainRepository,
-         RandomProvider randomProvider,
-         QuestionMetadataBaseRepository ctrlFlowQuestionMetadataRepository,
-         QuestionRequestLogRepository questionRequestLogRepository) {
-        super(randomProvider, questionRequestLogRepository);
+    public ControlFlowStatementsDomain(
+            DomainEntity domainEntity,
+            LocalizationService localizationService,
+            RandomProvider randomProvider,
+            QuestionMetadataRepository questionMetadataRepository) {
+        super(domainEntity, randomProvider);
+
         this.localizationService = localizationService;
-        this.ctrlFlowQuestionMetadataRepository = ctrlFlowQuestionMetadataRepository;
-        name = "ControlFlowStatementsDomain";
-//        if (domainRepository != null)
-        domainEntity = domainRepository.findById(getDomainId()).orElseThrow();
+        this.rdfStorage = new LocalRdfStorage(
+                domainEntity, questionMetadataRepository, new QuestionMetadataManager(this, questionMetadataRepository));
 
         fillConcepts();
         readLaws(this.getClass().getClassLoader().getResourceAsStream(LAWS_CONFIG_PATH));
         // using update() as init
         // OFF: // update();
-    }
-
-    @Override
-    public String getShortName() {
-        return "ctrl_flow";
     }
 
     public static void initVocab() {
@@ -215,12 +202,6 @@ public class ControlFlowStatementsDomain extends Domain {
         // init questions storage
         getRdfStorage();
     }
-
-    @Override
-    public QuestionMetadataBaseRepository getQuestionMetadataRepository() {
-        return ctrlFlowQuestionMetadataRepository;
-    }
-
 
     @Override
     public Model getSchemaForSolving() {
@@ -511,14 +492,13 @@ public class ControlFlowStatementsDomain extends Domain {
             try {
                 // new version - invoke rdfStorage search
                 questionRequest = fillBitmasksInQuestionRequest(questionRequest);
-                saveQuestionRequest(questionRequest);
-                foundQuestions = getRdfStorage().searchQuestions(questionRequest, randomPoolSize);
+                foundQuestions = getRdfStorage().searchQuestions(this, questionRequest, randomPoolSize);
 
                 // search again if nothing found with "TO_COMPLEX"
                 SearchDirections lawsSearchDir = questionRequest.getLawsSearchDirection();
                 if (foundQuestions.isEmpty() && lawsSearchDir == SearchDirections.TO_COMPLEX) {
                     questionRequest.setLawsSearchDirection(SearchDirections.TO_SIMPLE);
-                    foundQuestions = getRdfStorage().searchQuestions(questionRequest, randomPoolSize);
+                    foundQuestions = getRdfStorage().searchQuestions(this, questionRequest, randomPoolSize);
                 }
                 log.info("Autogenerated questions found: " + foundQuestions.size());
             } catch (RuntimeException ex) {
@@ -2050,12 +2030,6 @@ public class ControlFlowStatementsDomain extends Domain {
                 Question.class);
 
         return question;
-    }
-
-    @NotNull
-    @Override
-    public String getDomainId() {
-        return "ControlFlowStatementsDomain";
     }
 
     @Override
