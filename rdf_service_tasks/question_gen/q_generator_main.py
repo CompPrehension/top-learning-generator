@@ -1,5 +1,6 @@
 # q_generator_main.py
 
+import argparse
 import random  # using seed, sample
 import os.path
 import shutil
@@ -204,12 +205,31 @@ def save_output_question_file(q: dbmeta.Questions, output_dir):
 
     if file_subpath and base_dir:
         os.makedirs(output_dir, exist_ok=True)
-        shutil.copyfile(os.path.join(base_dir, file_subpath), output_dir)
+        shutil.copyfile(
+            os.path.join(base_dir, file_subpath),
+            # file name only >>
+            os.path.join(output_dir, os.path.basename(file_subpath)),
+        )
     else:
         raise ValueError('To export DATA of a question, both file_subpath and base_dir must be known, but got:' +
                          str((file_subpath, base_dir)))
 
 
 if __name__ == "__main__":
-    main("c:/Temp2/cf_v9-expr-concepts/__result", "c:/data/compp-gen/ctrlflow/out", "-old-", 3)
-    ...
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input' , required=True, help='input_templates_dir: path to a directory containing .ttl files with template data')
+    parser.add_argument('-o', '--output', required=True, help='output_questions_dir: path to a directory where to store resulting .json files with question data')
+    parser.add_argument('-g', '--origin', default=None, help='questions_origin: what to save in "origin" field of question metadata (`None`/`null` by default)')
+    parser.add_argument('-n', '--limit', type=int, default=0, help='templates_limit: maximum templates to process; 0 (by default) means no limit.')
+
+    args = vars(parser.parse_args())
+    ### print(args)
+
+    main(args['input'], args['output'], args["origin"], args['limit'])
+    # main("c:/data/compp-gen/control_flow/parsed", "c:/data/compp-gen/control_flow/questions", "ag", 5)
+
+    # example cmd ...
+    '''
+        python q_generator_main.py -i "c:/data/compp-gen/control_flow/parsed" -o "c:/data/compp-gen/control_flow/questions" -g "ag" -n 5
+    '''

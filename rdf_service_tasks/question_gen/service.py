@@ -71,7 +71,7 @@ sparql_endpoint = None
 def read_access_config(file_path='./access_urls.yml'):
     global CONFIG
     if CONFIG:
-        return
+        return CONFIG
 
     try:
         # read config
@@ -1483,7 +1483,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
     print("Total questions generated: ", questions and len(questions) or 0)
 
     if not questions:
-        return 0
+        return ()
 
     seen_names = set()
     saved_questions = []
@@ -1645,12 +1645,12 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         metadata = dict(
             name = q.name,
             domain_shortname = 'control_flow',
-            template_id = template.id,
+            template_id = q.template.id,
             qt_graph = None,
             qt_s_graph = None,
             q_graph = None,
             q_s_graph = None,
-            q_data_graph = q_data_graph,
+            q_data_graph = q.q_data_graph,
             tag_bits = q.tag_bits,
             concept_bits = q.concept_bits,
             law_bits = q.law_bits,
@@ -1663,7 +1663,7 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
             _stage = q._stage,
             _version = q._version,
         )
-        q_dict['metadata'] = metadata
+        # q_dict['metadata'] = metadata
         q_dict['questionData']['options']['metadata'] = metadata
 
 
@@ -1685,7 +1685,7 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         print("exception in generate_data_for_question:")
         print(e)
         print()
-        # raise
+        raise
         q._stage += 10  # mark the error
         q.save()
         return None
