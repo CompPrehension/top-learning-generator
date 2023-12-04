@@ -92,18 +92,18 @@ ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* so
     if (auto parenOperator = dyn_cast<clang::ParenExpr>(node))
     {
         auto expr = mapToDst(parenOperator->getSubExpr(), sourceMgr);
-        return new ExpressionDomainParenExprNode((clang::ParenExpr*)parenOperator, expr);
+        return new ExpressionDomainParenExprNode(const_cast<clang::ParenExpr*>(parenOperator), expr);
     }
     if (auto binaryOperator = dyn_cast<clang::BinaryOperator>(node))
     {
         auto left = mapToDst(binaryOperator->getLHS(), sourceMgr);
         auto right = mapToDst(binaryOperator->getRHS(), sourceMgr);
-        return new ExpressionDomainBinaryOperatorNode((clang::BinaryOperator*)binaryOperator, string(*internal::getOpName(*binaryOperator)), left, right);
+        return new ExpressionDomainBinaryOperatorNode(const_cast<clang::BinaryOperator*>(binaryOperator), string(*internal::getOpName(*binaryOperator)), left, right);
     }
     if (auto unaryOperator = dyn_cast<clang::UnaryOperator>(node))
     {
         auto child = mapToDst(unaryOperator->getSubExpr(), sourceMgr);
-        return new ExpressionDomainUnaryOperatorNode((clang::UnaryOperator*)unaryOperator, string(*internal::getOpName(*unaryOperator)), child);
+        return new ExpressionDomainUnaryOperatorNode(const_cast<clang::UnaryOperator*>(unaryOperator), string(*internal::getOpName(*unaryOperator)), child);
     }
     if (auto intValue = dyn_cast<clang::IntegerLiteral>(node))
     {
