@@ -15,6 +15,7 @@ struct ControlFlowConceptHash
         return std::hash<int>()(point);
     }
 };
+#define ControlFlowConceptsSet unordered_set<ControlFlowConcept, ControlFlowConceptHash>
 
 inline string toRdfString(ControlFlowConcept cfConcept) {
     switch (cfConcept) {

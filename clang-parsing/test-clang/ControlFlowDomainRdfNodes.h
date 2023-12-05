@@ -153,7 +153,7 @@ private:
 class ControlFlowDomainAlgorythmRdfNode : public ControlFlowDomainRdfNode
 {
 public:
-	ControlFlowDomainAlgorythmRdfNode(string algorithmName, int id, ControlFlowDomainSequenceRdfNode* sequence, unordered_set<ControlFlowConcept, ControlFlowConceptHash> concepts)
+	ControlFlowDomainAlgorythmRdfNode(string algorithmName, int id, ControlFlowDomainSequenceRdfNode* sequence, ControlFlowConceptsSet concepts)
 		: ControlFlowDomainRdfNode("algorithm", id), sequence(sequence), algorithmName(algorithmName), concepts(concepts)
 	{
 
@@ -199,7 +199,7 @@ public:
 	}
 
 private:
-	unordered_set<ControlFlowConcept, ControlFlowConceptHash> concepts;
+	ControlFlowConceptsSet concepts;
 	string algorithmName;
 	ControlFlowDomainSequenceRdfNode* sequence;
 };

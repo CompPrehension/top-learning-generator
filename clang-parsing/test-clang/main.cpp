@@ -112,7 +112,7 @@ private:
     }
 
     void runForCntrlFlowDomain(const clang::FunctionDecl* node, const MatchFinder::MatchResult& Result) {
-        ControlFlowDomainFuncDeclNode* dstNode = NULL;
+        ControlFlowDomainAlgo* dstNode = NULL;
         ControlFlowDomainAlgorythmRdfNode* rdfNode = NULL;
         string functionName;
         string shortFilename = "";
@@ -157,7 +157,7 @@ private:
 
             auto time = std::time(0);
             auto algoName = functionId + string("__") + to_string(time);
-            rdfNode = mapToRdfNode(algoName, dstNode, *Result.SourceManager, *Result.Context);
+            rdfNode = mapToRdfNode(algoName, dstNode->getRoot(), *Result.SourceManager, *Result.Context);
             auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
             Logger::info("Successfully converted to rdf");
 
@@ -200,168 +200,7 @@ private:
     }
 };
 
-class FuncPrinter : public MatchFinder::MatchCallback {
-  private:
-    string repoPathId;
-    int func_total = 0;
-    unordered_set<int64_t> processed_funcs;
-    map<int64_t, string> rec_depth_1_srcs;
-    map<int64_t, string> rec_depth_2plus_srcs;
-
-  public:
-    FuncPrinter(string repoPathId) : repoPathId(repoPathId) {}
-
-    int get_func_total() { return func_total; }
-    int get_func_rec_depth_1() { return rec_depth_1_srcs.size(); }
-    int get_func_rec_depth_2plus() { return rec_depth_2plus_srcs.size(); }
-
-    map<int64_t, string> &get_rec_depth_1_srcs() { return rec_depth_1_srcs; }
-    map<int64_t, string> &get_rec_depth_2plus_srcs() {
-        return rec_depth_2plus_srcs;
-    }
-
-    virtual void run(const MatchFinder::MatchResult &Result) {
-        if (auto node = Result.Nodes.getNodeAs<clang::FunctionDecl>(
-                "recursionMatcher")) {
-            runForFunc(node, Result);
-            return;
-        }
-    }
-    void runForFunc(const clang::FunctionDecl *node,
-                    const MatchFinder::MatchResult &Result) {
-        if (processed_funcs.contains(node->getID()))
-            return;
-
-        auto sourcePath = node->getSourceRange().getBegin().printToString(
-            *Result.SourceManager);
-        if (sourcePath.find(repoPathId) == std::string::npos)
-            return;
-
-        //cout << "Found function " << node->getDeclName().getAsString() << endl;
-
-        int maxDepth     = 6;
-        int currentDepth = 1;
-        bool isFound = false;
-
-        vector<CallExpr *> current_wave_stack;
-        auto funcCalls = recursiveFindFunctionCalls(node->getBody());
-        current_wave_stack.insert(current_wave_stack.end(), std::begin(funcCalls), std::end(funcCalls));
-        
-        while (currentDepth <= maxDepth) {
-            vector<CallExpr *> new_wave_stack;
-            for (auto call : current_wave_stack) {
-                auto* callFuncDecl = call->getDirectCallee();
-                if (callFuncDecl) {
-                  auto callFuncDeclDef = callFuncDecl->getDefinition();
-                  if (callFuncDeclDef != nullptr &&
-                      callFuncDeclDef->getID() == node->getID()) {
-                    isFound = true;
-                    goto after_found;
-                  }
-                  if (callFuncDeclDef) {
-                    auto funcCalls =
-                        recursiveFindFunctionCalls(callFuncDeclDef->getBody());
-                    new_wave_stack.insert(new_wave_stack.end(),
-                                          std::begin(funcCalls),
-                                          std::end(funcCalls));
-                  }
-                }
-            }
-
-            current_wave_stack.clear();
-            current_wave_stack.insert(current_wave_stack.end(),
-                                      std::begin(new_wave_stack),
-                                      std::end(new_wave_stack));
-            ++currentDepth;
-        }
-
-
-        after_found:
-        ++func_total;
-        if (isFound && currentDepth == 1) {
-            rec_depth_1_srcs[node->getID()] =
-                node->getSourceRange().getBegin().printToString(
-                    *Result.SourceManager);
-        }            
-        if (isFound && currentDepth > 1) {
-            rec_depth_2plus_srcs[node->getID()] =
-                node->getSourceRange().getBegin().printToString(
-                    *Result.SourceManager);
-        }
-        processed_funcs.insert(node->getID());
-    }
-
-    set<CallExpr *> recursiveFindFunctionCalls(clang::Stmt *stmt) {
-        set<CallExpr *> funcCalls;
-        recursiveFindFunctionCalls(stmt, funcCalls);
-        return funcCalls;
-    }
-
-    void recursiveFindFunctionCalls(clang::Stmt *stmt, set<CallExpr *> &acc) {
-        if (stmt == nullptr)
-            return;       
-        if (auto *funcCallNode = dyn_cast<CallExpr>(stmt)) {
-            acc.insert(funcCallNode);
-            return;
-        }
-
-        for (clang::Stmt::child_iterator i = stmt->child_begin(),
-                                         e = stmt->child_end();
-             i != e; ++i) {
-            Stmt *currStmt = *i;
-            recursiveFindFunctionCalls(currStmt, acc);
-        }
-    }
-
-};
-
 int main(int argc, const char** argv) {
-    auto repoPathId = string(argv[argc - 1]);
-    cout << "repoPathId = " << repoPathId << endl;
-
-    auto ExpectedParser = CommonOptionsParser::create(argc, argv, MyToolCategory);
-    if (!ExpectedParser) {
-        // Fail gracefully for unsupported options.
-        llvm::errs() << ExpectedParser.takeError();
-        return 1;
-    }
-
-    CommonOptionsParser &OptionsParser = ExpectedParser.get();
-    ClangTool Tool(OptionsParser.getCompilations(),
-                   OptionsParser.getSourcePathList());
-    FuncPrinter Printer(repoPathId);
-    MatchFinder Finder;
-    
-    auto matcher =
-        functionDecl(hasBody(compoundStmt())).bind("recursionMatcher");
-    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, matcher),
-        &Printer);
-
-    int result = Tool.run(newFrontendActionFactory(&Finder).get());
-
-    cout << "=== Results for repo " << repoPathId << endl;
-    cout << "Total = " << Printer.get_func_total() << "; rec1 = "
-         << Printer.get_func_rec_depth_1() << "; rec2plus = "
-         << Printer.get_func_rec_depth_2plus() << endl;
-
-    if (Printer.get_func_rec_depth_1() > 0) {
-        cout << "rec1 examples:" << endl;
-        for (const auto &[key, value] : Printer.get_rec_depth_1_srcs())
-            cout << value << endl;
-    }
-    if (Printer.get_func_rec_depth_2plus() > 0) {
-        cout << "rec2plus examples:" << endl;
-        for (const auto &[key, value] : Printer.get_rec_depth_2plus_srcs())
-            cout << value << endl;
-    }
-    cout << "=== END Results for repo " << repoPathId << endl;
-
-    return result;
-}
-
-
-
-int main2(int argc, const char** argv) {
     std::cout << typeid(int).name() << std::endl;
 
     auto domainName = string(argv[argc - 2]);    
@@ -416,4 +255,164 @@ int main2(int argc, const char** argv) {
     }    
 
     return Tool.run(newFrontendActionFactory(&Finder).get());
+}
+
+class FuncPrinter : public MatchFinder::MatchCallback {
+  private:
+    string repoPathId;
+    int func_total = 0;
+    unordered_set<int64_t> processed_funcs;
+    map<int64_t, string> rec_depth_1_srcs;
+    map<int64_t, string> rec_depth_2plus_srcs;
+
+  public:
+    FuncPrinter(string repoPathId) : repoPathId(repoPathId) {}
+
+    int get_func_total() { return func_total; }
+    int get_func_rec_depth_1() { return rec_depth_1_srcs.size(); }
+    int get_func_rec_depth_2plus() { return rec_depth_2plus_srcs.size(); }
+
+    map<int64_t, string> &get_rec_depth_1_srcs() { return rec_depth_1_srcs; }
+    map<int64_t, string> &get_rec_depth_2plus_srcs() {
+        return rec_depth_2plus_srcs;
+    }
+
+    virtual void run(const MatchFinder::MatchResult &Result) {
+        if (auto node = Result.Nodes.getNodeAs<clang::FunctionDecl>(
+                "recursionMatcher")) {
+            runForFunc(node, Result);
+            return;
+        }
+    }
+    void runForFunc(const clang::FunctionDecl *node,
+                    const MatchFinder::MatchResult &Result) {
+        if (processed_funcs.contains(node->getID()))
+            return;
+
+        auto sourcePath = node->getSourceRange().getBegin().printToString(
+            *Result.SourceManager);
+        if (sourcePath.find(repoPathId) == std::string::npos)
+            return;
+
+        // cout << "Found function " << node->getDeclName().getAsString() <<
+        // endl;
+
+        int maxDepth = 6;
+        int currentDepth = 1;
+        bool isFound = false;
+
+        vector<CallExpr *> current_wave_stack;
+        auto funcCalls = recursiveFindFunctionCalls(node->getBody());
+        current_wave_stack.insert(current_wave_stack.end(),
+                                  std::begin(funcCalls), std::end(funcCalls));
+
+        while (currentDepth <= maxDepth) {
+            vector<CallExpr *> new_wave_stack;
+            for (auto call : current_wave_stack) {
+                auto *callFuncDecl = call->getDirectCallee();
+                if (callFuncDecl) {
+                  auto callFuncDeclDef = callFuncDecl->getDefinition();
+                  if (callFuncDeclDef != nullptr &&
+                      callFuncDeclDef->getID() == node->getID()) {
+                    isFound = true;
+                    goto after_found;
+                  }
+                  if (callFuncDeclDef) {
+                    auto funcCalls =
+                        recursiveFindFunctionCalls(callFuncDeclDef->getBody());
+                    new_wave_stack.insert(new_wave_stack.end(),
+                                          std::begin(funcCalls),
+                                          std::end(funcCalls));
+                  }
+                }
+            }
+
+            current_wave_stack.clear();
+            current_wave_stack.insert(current_wave_stack.end(),
+                                      std::begin(new_wave_stack),
+                                      std::end(new_wave_stack));
+            ++currentDepth;
+        }
+
+    after_found:
+        ++func_total;
+        if (isFound && currentDepth == 1) {
+            rec_depth_1_srcs[node->getID()] =
+                node->getSourceRange().getBegin().printToString(
+                    *Result.SourceManager);
+        }
+        if (isFound && currentDepth > 1) {
+            rec_depth_2plus_srcs[node->getID()] =
+                node->getSourceRange().getBegin().printToString(
+                    *Result.SourceManager);
+        }
+        processed_funcs.insert(node->getID());
+    }
+
+    set<CallExpr *> recursiveFindFunctionCalls(clang::Stmt *stmt) {
+        set<CallExpr *> funcCalls;
+        recursiveFindFunctionCalls(stmt, funcCalls);
+        return funcCalls;
+    }
+
+    void recursiveFindFunctionCalls(clang::Stmt *stmt, set<CallExpr *> &acc) {
+        if (stmt == nullptr)
+            return;
+        if (auto *funcCallNode = dyn_cast<CallExpr>(stmt)) {
+            acc.insert(funcCallNode);
+            return;
+        }
+
+        for (clang::Stmt::child_iterator i = stmt->child_begin(),
+                                         e = stmt->child_end();
+             i != e; ++i) {
+            Stmt *currStmt = *i;
+            recursiveFindFunctionCalls(currStmt, acc);
+        }
+    }
+};
+
+int caclRecursions(int argc, const char **argv) {
+    auto repoPathId = string(argv[argc - 1]);
+    cout << "repoPathId = " << repoPathId << endl;
+
+    auto ExpectedParser =
+        CommonOptionsParser::create(argc, argv, MyToolCategory);
+    if (!ExpectedParser) {
+        // Fail gracefully for unsupported options.
+        llvm::errs() << ExpectedParser.takeError();
+        return 1;
+    }
+
+    CommonOptionsParser &OptionsParser = ExpectedParser.get();
+    ClangTool Tool(OptionsParser.getCompilations(),
+                   OptionsParser.getSourcePathList());
+    FuncPrinter Printer(repoPathId);
+    MatchFinder Finder;
+
+    auto matcher =
+        functionDecl(hasBody(compoundStmt())).bind("recursionMatcher");
+    Finder.addMatcher(traverse(TK_IgnoreUnlessSpelledInSource, matcher),
+                      &Printer);
+
+    int result = Tool.run(newFrontendActionFactory(&Finder).get());
+
+    cout << "=== Results for repo " << repoPathId << endl;
+    cout << "Total = " << Printer.get_func_total()
+         << "; rec1 = " << Printer.get_func_rec_depth_1()
+         << "; rec2plus = " << Printer.get_func_rec_depth_2plus() << endl;
+
+    if (Printer.get_func_rec_depth_1() > 0) {
+        cout << "rec1 examples:" << endl;
+        for (const auto &[key, value] : Printer.get_rec_depth_1_srcs())
+            cout << value << endl;
+    }
+    if (Printer.get_func_rec_depth_2plus() > 0) {
+        cout << "rec2plus examples:" << endl;
+        for (const auto &[key, value] : Printer.get_rec_depth_2plus_srcs())
+            cout << value << endl;
+    }
+    cout << "=== END Results for repo " << repoPathId << endl;
+
+    return result;
 }

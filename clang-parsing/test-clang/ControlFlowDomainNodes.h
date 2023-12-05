@@ -29,14 +29,14 @@ public:
 	}
 	Stmt* getAstNode() { return this->astNode; };
 
-	unordered_set<ControlFlowConcept, ControlFlowConceptHash> calcConcepts() {
-		unordered_set<ControlFlowConcept, ControlFlowConceptHash> result;
+	ControlFlowConceptsSet calcConcepts() {
+		ControlFlowConceptsSet result;
 		CaclConcepts(astNode, result);
 		return result;
 	}
 
 private:
-	static void CaclConcepts(Stmt* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash> & concepts) {
+	static void CaclConcepts(Stmt* astNode, ControlFlowConceptsSet& concepts) {
 		for (auto* ch : astNode->children()) {
 			if (!ch)
 				continue;
@@ -52,7 +52,7 @@ private:
 		}
 	}
 
-	static void CaclConcepts(DeclStmt* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash>& concepts) {
+	static void CaclConcepts(DeclStmt* astNode, ControlFlowConceptsSet& concepts) {
 		for (auto* decl : astNode->decls()) {
 			if (auto* varDecl = dyn_cast<VarDecl>(decl)) {
 				// auto declString = (varDecl != NULL) ? varDecl->getType().getAsString() : "";
@@ -68,7 +68,7 @@ private:
 		}
 	}
 
-	static void CaclConcepts(Expr* astNode, unordered_set<ControlFlowConcept, ControlFlowConceptHash>& concepts) {
+	static void CaclConcepts(Expr* astNode, ControlFlowConceptsSet& concepts) {
 		bool containsArrayBrNode = false;
 		bool containsMemberAccess = false;
 		bool containsPtr = false;
@@ -78,7 +78,7 @@ private:
 		for (auto* ch : astNode->children()) {
 			containsArrayBrNode = containsArrayBrNode || dyn_cast<clang::ArraySubscriptExpr>(ch);
 			containsMemberAccess = containsMemberAccess || dyn_cast<clang::MemberExpr>(ch);
-			containsFuncCall = containsFuncCall || dyn_cast<clang::CallExpr>(ch);
+            containsFuncCall = containsFuncCall || dyn_cast<clang::CallExpr>(ch) && !dyn_cast<clang::CXXOperatorCallExpr>(ch);
 			containsExplicitCast = containsExplicitCast || dyn_cast<clang::CStyleCastExpr>(ch);
 
 			auto chAsUnary = dyn_cast<clang::UnaryOperator>(ch);
@@ -147,6 +147,14 @@ public:
 	ControlFlowDomainExprStmtNode(Expr* astNode)
 		: ControlFlowDomainStmtNode(astNode)
 	{		
+	}
+};
+
+class ControlFlowDomainExprWithFuncCallsStmtNode : public ControlFlowDomainExprStmtNode {
+public:
+    ControlFlowDomainExprWithFuncCallsStmtNode(Expr *astNode)
+        : ControlFlowDomainExprStmtNode(astNode)
+	{
 	}
 };
 
@@ -584,25 +592,41 @@ public:
 	}
 };
 
+
+class ControlFlowDomainFuncDeclNode;
+struct ControlFlowDomainFuncDeclNodeHash {
+	size_t operator() (ControlFlowDomainFuncDeclNode* const& c) const;
+};
+struct ControlFlowDomainFuncDeclNodeEq {
+	bool operator () (ControlFlowDomainFuncDeclNode* const& lhs, ControlFlowDomainFuncDeclNode* const& rhs) const;
+};
+#define ControlFlowDomainFuncDeclNodeMap std::unordered_map<ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNodeHash, ControlFlowDomainFuncDeclNodeEq>
+#define ControlFlowDomainFuncDeclNodeSet std::unordered_set<ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNodeHash, ControlFlowDomainFuncDeclNodeEq>
 class ControlFlowDomainFuncDeclNode
 {
 public:
-	ControlFlowDomainFuncDeclNode(FunctionDecl* astNode, ControlFlowDomainStmtNode* body)
-		: astNode(astNode), body(body)
+	ControlFlowDomainFuncDeclNode(FunctionDecl* astNode, ControlFlowDomainStmtNode* body, ControlFlowDomainFuncDeclNodeSet& calledFunctions)
+		: astNode(astNode), body(body), calledFunctions(calledFunctions)
 	{
 	}
 	~ControlFlowDomainFuncDeclNode()
 	{
 		if (this->body)
 			delete this->body;
+		// TODO mey be deleted twice
+		//for (auto func : this->calledFunctions)
+		//	delete func; 
 	}
 
 	ControlFlowDomainStmtNode* getBody() { return this->body; }
 
 	FunctionDecl* getAstNode() { return this->astNode; }
 
+	ControlFlowDomainFuncDeclNodeSet& getCalledFunctions() { return this->calledFunctions; }
+
 private:
 	ControlFlowDomainStmtNode* body;
+	ControlFlowDomainFuncDeclNodeSet calledFunctions;
 	FunctionDecl* astNode;
 };
 
@@ -614,4 +638,30 @@ public:
 	{
 	}
 };
+
+class ControlFlowDomainAlgo
+{
+
+public:
+	ControlFlowDomainAlgo(ControlFlowDomainFuncDeclNodeSet& functions, ControlFlowDomainFuncDeclNode* root)
+		: functions(functions), root(root) {
+	}
+	virtual ~ControlFlowDomainAlgo() {
+		for (auto x : this->functions) {
+			delete x;
+		}
+	}
+
+	ControlFlowDomainFuncDeclNode* getRoot() { return this->root; }
+
+	ControlFlowDomainFuncDeclNodeSet& getFunctions() {
+		return this->functions;
+	}
+
+private:
+	ControlFlowDomainFuncDeclNodeSet functions;
+	ControlFlowDomainFuncDeclNode* root = nullptr;
+};
+
+
 
