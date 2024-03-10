@@ -34,7 +34,6 @@ def main(input_templates_dir: str, output_questions_dir: str, questions_origin: 
 
     ch.hit('templates found on disk')
 
-
     if templates_limit > 0 and (L := len(file_and_name_list)) > templates_limit:
         # randomly select some of found items
         print(f'Truncating the set of templates from {L} to {templates_limit}.')
@@ -60,12 +59,14 @@ def main(input_templates_dir: str, output_questions_dir: str, questions_origin: 
         qt.origin = questions_origin
 
         ok = load_template(qt, input_templates_dir)
-        if not ok: continue
+        if not ok:
+            continue
 
         # Работаем с шаблоном дальше ...
 
         ok = solve_template(qt, verbose=True)
-        if not ok: continue
+        if not ok:
+            continue
 
         # filter_by_concepts = 0
         # # filter_by_concepts = dbmeta.names_to_bitmask(['break', 'continue'])
@@ -216,12 +217,15 @@ def save_output_question_file(q: dbmeta.Questions, output_dir):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input' , required=True, help='input_templates_dir: path to a directory containing .ttl files with template data')
-    parser.add_argument('-o', '--output', required=True, help='output_questions_dir: path to a directory where to store resulting .json files with question data')
-    parser.add_argument('-g', '--origin', default=None, help='questions_origin: what to save in "origin" field of question metadata (`None`/`null` by default)')
-    parser.add_argument('-n', '--limit', type=int, default=0, help='templates_limit: maximum templates to process; 0 (by default) means no limit.')
+    parser.add_argument('-i', '--input', required=True,
+                        help='input_templates_dir: path to a directory containing .ttl files with template data')
+    parser.add_argument('-o', '--output', required=True,
+                        help='output_questions_dir: path to a directory where to store resulting .json files with question data')
+    parser.add_argument('-g', '--origin', default=None,
+                        help='questions_origin: what to save in "origin" field of question metadata (`None`/`null` by default)')
+    parser.add_argument('-n', '--limit', type=int, default=0,
+                        help='templates_limit: maximum templates to process; 0 (by default) means no limit.')
 
     args = vars(parser.parse_args())
     ### print(args)

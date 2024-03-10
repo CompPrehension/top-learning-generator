@@ -5,6 +5,7 @@ from functools import reduce, lru_cache
 from itertools import repeat, product, starmap
 from operator import add, eq, or_
 from random import shuffle, random
+from typing import Optional
 
 import rdflib
 from rdflib import Graph, RDF
@@ -14,7 +15,7 @@ from rdflib_utils import graph_lookup, pretty_rdf, TripleOverrider
 
 LOOP_MAX_ITERATIONS = 3
 
-# global var can be set from outside the thread to interrupt it
+# global var can be set from outside a thread to interrupt it
 _INTERRUPT_BY_TIMEOUT = False
 
 
@@ -31,8 +32,37 @@ def check_interrupt():
         raise StopIteration("Interrupted by timeout")
 
 
+""" action_class_name -> {reason_name -> [violation names]} """
+_MAP_REASON_TO_VIOLATIONS: Optional[dict] = None
+
+
+def get_reason_to_negative_laws_mappings() -> dict:
+    global _MAP_REASON_TO_VIOLATIONS
+    if not _MAP_REASON_TO_VIOLATIONS:
+        import json
+        with open(r'lookup_data/error-hier-by-action.json') as f:
+            _MAP_REASON_TO_VIOLATIONS = json.load(f)
+    return _MAP_REASON_TO_VIOLATIONS
+
+
+def map_reason_to_negative_laws(reason_name: str, action_class_name: str = None) -> list[str]:
+    """ Hand-prepared reason-to-error mapping with new (03.2024) error kinds """
+    mappings = get_reason_to_negative_laws_mappings()
+
+    # read exact mapping
+    if action_class_name and action_class_name in mappings:
+        return mappings[action_class_name]
+
+    # get all violations possible in any action class
+    return sorted(set(
+        viol_name
+        for mapping in mappings.values() if reason_name in mapping
+        for viol_name in mapping[reason_name]
+    ))
+
+
 class jsObj(dict):
-    'JS-object-like dict (access to "foo": obj.foo as well as obj["foo"])'
+    """JS-object-like dict (access to "foo": obj.foo as well as obj["foo"])"""
     # def __init__(self, *args, **kw):
     #     super().__init__(*args, **kw)
     __getattr__ = dict.__getitem__
@@ -256,15 +286,44 @@ def way_from_transition(bound1, value_gen=None, g=None, gl=None) -> (Way, rdflib
         way.reasons = frozenset(
             map(NS_code.localize, g.objects(R, gl(':reason_kind')))
         )
-        way.possible_violations = frozenset(
+
+        # TODO!
+        # new data source: hand-prepared reason-to-error mapping with new (03.2024) error kinds
+        violations = set(
+            law
+            for reason in way.reasons
+            for law in map_reason_to_negative_laws(
+                reason,
+                _bound_to_parent_action_class_name(bound1, g, gl)  # pass action_class_name
+            )
+        )
+        # TODO!
+
+        # the old way: use links assigned by jena rules
+        violations |= set(
             map(NS_code.localize, g.objects(R, gl(':possible_violation')))
         )
+        way.possible_violations = violations
     # else:
     #     print('No reason node for boundaries: %s, %s' % (bound1, bnd2))
     way.len = 1 if R else 0  # do not count hidden transitions
     way.depth = 1
     way.acts = (bound1, bnd2)
     return (way, bnd2)
+
+
+def _bound_to_parent_action_class_name(bound, g=None, gl=None) -> Optional[str]:
+    mappings = get_reason_to_negative_laws_mappings()
+    action_class_names = set(mappings.keys())
+    parent_names = set(
+        map(NS_code.localize, g.objects(parent, gl(':parent_of')))
+        for parent in g.objects(bound, gl(':boundary_of'))
+    )
+    common_names = action_class_names & parent_names
+    if common_names:
+        assert len(common_names) == 1, common_names
+        return next(iter(common_names))
+    return None
 
 
 def combine_ways_parts(way_parts: list):
@@ -487,7 +546,7 @@ def ways_through_inner(st, value_gen, g, gl, bound_from=None, finish_bounds=()):
         # one step
         way_step, bound = way_from_transition(bound, value_gen, g, gl)
         way_parts[-1][0] += way_step
-        if  not bound or  bound in finish_bounds:
+        if not bound or bound in finish_bounds:
             break
 
         deeper_st = g.value(bound, gl(':begin_of'), None)

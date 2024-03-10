@@ -161,7 +161,6 @@ def update_bit_field(row_instance, field_name: str, new_bits: int, replace_mode=
 
 
 
-
 def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, update_always=False):
     ''' search record by `key_fields` and update it with `set_fields` '''
     record, created = entity.get_or_create(**key_fields)
@@ -175,7 +174,7 @@ def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, u
                 need_save = True
     if hasattr(record, 'bit') and not record.bit:
         # retrieve max bit value from table and then double it
-        max_bit = entity.select(fn.Max(entity.bit)).scalar() or 1/2;  # smallest bit is 1
+        max_bit = entity.select(fn.Max(entity.bit)).scalar() or 1/2  # smallest bit is 1
         record.bit = int(2 * max_bit)  # fill bitmask's bit as desired by my businesslogic
         need_save = True
     if need_save:

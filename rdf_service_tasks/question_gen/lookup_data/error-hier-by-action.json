@@ -1,0 +1,143 @@
+{
+  "alternative_multi_without_else": {
+    "AltEndAllFalse": [
+      "AltBranchOnFalse"
+    ],
+    "AltBranchBegin": [
+      "AltCondAfterTrue"
+    ],
+    "NextAltCondition": [
+      "AltBranchOnFalse"
+    ]
+  },
+  "alternative": {
+    "AltBegin": [
+      "AltEarlyEndNoCond"
+    ],
+    "AltBranchBegin": [
+      "AltCondAfterTrue",
+      "AltEarlyEndNoBranch"
+    ],
+    "AltEndAfterBranch": [
+      "AltAnotherBranch",
+      "AltBranchDup",
+      "AltCondAfterBranch"
+    ]
+  },
+  "alternative_multi_with_else": {
+    "AltBranchBegin": [
+      "AltCondAfterTrue",
+      "AltElseOnTrue"
+    ],
+    "AltElseBranchBegin": [
+      "AltEarlyEndNoElse"
+    ]
+  },
+  "alternative_single_with_else": {
+    "AltBranchBegin": [
+      "AltElseOnTrue"
+    ],
+    "AltElseBranchBegin": [
+      "AltEarlyEndNoElse"
+    ]
+  },
+  "alternative_simple": {
+    "AltEndAllFalse": [
+      "AltBranchOnFalse"
+    ]
+  },
+  "do_while_loop": {
+    "PostCondLoopBegin": [
+      "PostCondLoopCondBeforeIter",
+      "PostCondLoopEarlyEndNoIter"
+    ],
+    "LoopCondBeginAfterIteration": [
+      "PostCondLoopNoCondBtwIters"
+    ],
+    "IterationBeginOnTrueCond": [
+      "LoopEarlyEndCondStillTrue",
+      "LoopNoEndOnFalseCond"
+    ],
+    "LoopEndOnFalseCond": [
+      "LoopIterOnFailedCond",
+      "LoopNoEndOnFalseCond"
+    ]
+  },
+  "while_loop": {
+    "IterationBeginOnTrueCond": [
+      "LoopEarlyEndCondStillTrue",
+      "LoopNoEndOnFalseCond"
+    ],
+    "PreCondLoopBegin": [
+      "LoopIterBeforeCond",
+      "PreCondLoopEarlyEndNoCond"
+    ],
+    "LoopEndOnFalseCond": [
+      "LoopIterOnFailedCond",
+      "LoopNoEndOnFalseCond"
+    ]
+  },
+  "for_loop": {
+    "IterationBeginOnTrueCond": [
+      "LoopEarlyEndCondStillTrue",
+      "LoopInitDup",
+      "LoopNoEndOnFalseCond",
+      "LoopUpdateBeforeIter"
+    ],
+    "LoopEndOnFalseCond": [
+      "LoopInitDup",
+      "LoopIterOnFailedCond",
+      "LoopNoEndOnFalseCond"
+    ],
+    "LoopUpdateAfterIteration": [
+      "LoopCondBeforeUpdate",
+      "LoopInitDup"
+    ],
+    "LoopWithInitBegin": [
+      "LoopCondBeforeInit",
+      "LoopIterBeforeCond"
+    ],
+    "LoopCondBeginAfterInit": [
+      "LoopIterBeforeCond",
+      "LoopUpdateBeforeCond"
+    ],
+    "LoopCondAfterUpdate": [
+      "LoopInitDup",
+      "LoopIterBeforeCond",
+      "LoopUpdateTwice"
+    ]
+  },
+  "foreach_loop": {
+    "IterationBeginOnTrueCond": [
+      "LoopEarlyEndCondStillTrue",
+      "LoopNoEndOnFalseCond"
+    ],
+    "LoopEndOnFalseCond": [
+      "LoopInitDup",
+      "LoopIterOnFailedCond",
+      "LoopNoEndOnFalseCond",
+      "PreUpdateLoopIterBeforeUpdate"
+    ],
+    "LoopUpdateOnTrueCond": [
+      "LoopInitDup",
+      "PreUpdateLoopIterBeforeUpdate"
+    ],
+    "IterationAfterUpdate": [
+      "LoopCondBeforeIter",
+      "LoopInitDup",
+      "LoopUpdateTwice"
+    ],
+    "LoopWithInitBegin": [
+      "LoopCondBeforeInit",
+      "LoopIterBeforeCond"
+    ],
+    "LoopCondBeginAfterInit": [
+      "LoopIterBeforeCond",
+      "LoopUpdateBeforeCond"
+    ],
+    "LoopCondBeginAfterIteration": [
+      "LoopInitDup",
+      "LoopUpdateBeforeCond"
+    ]
+  }
+}
