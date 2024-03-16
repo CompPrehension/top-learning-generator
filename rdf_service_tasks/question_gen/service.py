@@ -1064,7 +1064,10 @@ def sigmoid(x):
         return z / (1 + z)
 
 
-CONCEPT_CANDIDATES = "expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop return break continue".split()  # no `stmt` here.
+CONCEPT_CANDIDATES = """expr alternative if else-if else loop while_loop do_while_loop for_loop foreach_loop 
+    return break continue 
+    alternative_simple alternative_single_with_else 
+    alternative_multi_without_else alternative_multi_with_else""".split()  # no `stmt` here.
 
 
 def question_metrics(g, gl, question_dict, quiet=False):

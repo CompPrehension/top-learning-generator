@@ -189,7 +189,12 @@ def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 	return array
 
 # using output of ctrlstrct_run helper
-LEAF_ACTION_CLASSES = [s for s in (['algorithm', ] + ['return', 'break', 'continue', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop', 'stmt', 'else', 'infinite_loop', 'alternative', 'foreach_loop', 'ntimes_loop', 'func', 'if', 'expr'] + ['sequence', 'boundary'])]
+LEAF_ACTION_CLASSES = [s for s in (
+            ['algorithm', ] + ['return', 'break', 'continue', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop',
+                                                                   'stmt', 'else', 'infinite_loop', 'alternative',
+                                                                   'foreach_loop', 'ntimes_loop', 'func', 'if',
+                                                                   'expr'] + ['sequence', 'boundary'])]
+
 
 class AlgorithmGraphWalker(GView):
 	# def __init__(self, g: Graph, subject: URIRef, gl: graph_lookup=None):
@@ -377,6 +382,42 @@ def flatten_simple_blocks(g, gl):
 			# done.
 
 
+def ensure_body_sequence(g: Graph, gl: graph_lookup):
+    """Inject a sequence wrapping a single action as expected by the domain logic, unless it is already a sequence.
+    That transformation is usually not required but may arise sometimes.
+    """
+
+    for parent, child in g.subject_objects(gl(':body')):
+
+        if (child, RDF.type, gl(':sequence')) not in g:
+
+            parent_stmt_name = g.value(parent, gl(':stmt_name'), None)
+            parent_id = g.value(parent, gl(':id'), None)
+
+            body_stmt_name = parent_stmt_name[0] + "B" + parent_stmt_name[1:]  # insert 'B' next to 1st char
+            assert body_stmt_name != parent_stmt_name, parent_stmt_name
+            body_id = parent_id + 1
+            while (None, gl(':id'), body_id) in g:
+                body_id += 1
+
+            # remove old link
+            g.remove((parent, gl(':body'), child))
+
+            # add new object
+            subj = gl(f':{body_stmt_name}')
+            g.add((subj, RDF.type, gl(':sequence')))
+            g.add((subj, gl(':id'), body_id))
+            g.add((subj, gl(':stmt_name'), body_stmt_name))
+
+            # connect using new node as "proxy"
+            g.add((parent, gl(':body'), subj))
+            g.add((subj, gl(':body_item'), child))
+
+            print(f"Inserted sequence as body for `{parent_stmt_name}`.")
+
+        # done.
+
+
 def find_subject_of_type(g, class_uri):
 	# class_uri = NS_code.get('algorithm')  # -> 'http://vstu.ru/poas/code#algorithm'
 	subjects = list(g.subjects(RDF.type, URIRef(class_uri)))
@@ -407,9 +448,11 @@ def fix_algorithm_graph(g, gl):
 	# 1. FIX names
 	# fix_names_in_graph(g, gl, fix_complex_names=True)
 	fix_names_in_graph(g, gl, fix_complex_names=False)
+    # 2.1 REMOVE some nesting levels
+    flatten_simple_blocks(g, gl)
 
-	# 2. REMOVE some nesting levels
-	flatten_simple_blocks(g, gl)
+    # 2.2 Fix missing sequence blocks for body
+    ensure_body_sequence(g, gl)
 
 	# 3. REMOVE some statements
 	shrink_linear_stmts(g, gl)
