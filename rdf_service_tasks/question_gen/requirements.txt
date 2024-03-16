@@ -1,6 +1,6 @@
 # pyfilesystem
 fs
-pyfuseki
+# pyfuseki
 # sparqlwrapper
 rdflib
 PyYAML
