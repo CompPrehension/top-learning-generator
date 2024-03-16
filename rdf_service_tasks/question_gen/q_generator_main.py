@@ -121,7 +121,7 @@ def main(input_templates_dir: str, output_questions_dir: str, questions_origin: 
     ...
 
 
-def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3 * 1024, 40 * 1024), skip_first=0, limit=None):
+def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3 * 1024, 40 * 1024), skip_first=0, limit=None) -> list[tuple]:
     """ Find files with extension and of size within the specified range in bytes.
     :return: list of file paths.
     """
@@ -160,7 +160,7 @@ def find_templates(rdf_dir, wanted_ext=".ttl", file_size_filter=(3 * 1024, 40 * 
     return file_and_name_list
 
 
-def load_template(qt, base_dir):
+def load_template(qt: dbmeta.Templates, base_dir: str) -> bool:
     """ Загрузить данные шаблона для имеющейся записи Template из файла `qt.src_path` """
     path = base_dir + qt.src_path
     with open(path) as f:

@@ -32,7 +32,8 @@ from sparql_wrapper import Sparql
 # from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, \
 #     createQuestionTemplateDB, createQuestionDB
 
-sys.path.insert(1, '../../../c_owl/')
+sys.path.insert(1, '../../../c_owl/')  # dev location
+sys.path.insert(2, 'c_owl/')  # desired deploy location
 if 0:
     # just for debugger to see the code in different directory
     from ....c_owl.ctrlstrct_test import make_question_dict_for_alg_json
@@ -545,7 +546,7 @@ def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileServic
     else:
         qt_name = questionName
 
-    m = Graph();
+    m = Graph()
     for role in questionStages():
         if role.ordinal() >= GraphRole.QUESTION.ordinal():
             graph_name = questionName
@@ -553,8 +554,9 @@ def getQuestionModel(questionName, topRole=GraphRole.QUESTION_SOLVED, fileServic
             graph_name = qt_name
         gm = getQuestionSubgraph(graph_name, role, fileService=get_file_service());
         if gm:
-            m += gm;
-        if (role == topRole): break;
+            m += gm
+        if role == topRole:
+            break
     return m
 
 
@@ -671,7 +673,8 @@ def _patch_and_parse_ttl(file_data):
 
 
 def load_templates(limit=None) -> int:
-    """ rdf metadata: ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
+    """ rdf metadata:
+    * ! Set INIT_GLOBALS and PREFETCH_QUESTIONS to True !
     """
 
     # templates_total = 0
@@ -705,8 +708,7 @@ def load_templates(limit=None) -> int:
             qt.save()
             continue
 
-        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED,
-                                             m)  ### , _debug_path_suffix='.v2'
+        file_subpath = setQuestionSubgraphDB(qt, GraphRole.QUESTION_TEMPLATE, dbmeta.STAGE_QT_CREATED, m)  ### , _debug_path_suffix='.v2'
         done_count += 1
         if done_count % 20 == 0:
             ch.hit('   + 20 templates created')
@@ -1514,7 +1516,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
             complexity = metrics['integral_complexity']
             low, high = clamp_complexity
             if not (low <= complexity <= high):
-                print(f'-x- Cannot take this question: {complexity} is not within [{low} , {high}]')
+                print(f'-x- Cannot take this question: complexity = {complexity} is not within [{low} , {high}]')
                 continue
 
         suffix = question['name_suffix'] or ('_nocond_q%d' % questions_counter)
@@ -1532,7 +1534,7 @@ def process_template(qt, questions_counter=0, clamp_complexity=CLAMP_COMPLEXITY)
         for _i in range(3):
             try:
                 if _i > 0: print("       [NETWORK] Retry uploading model: take %d" % _i)
-                fileService.sendModel(file_path, model);
+                fileService.sendModel(file_path, model)
                 break
             except:
                 continue
@@ -2194,7 +2196,7 @@ def automatic_pipeline(batch=700, offset=0):
 if __name__ == '__main__':
     print('Initializing...')
 
-    # automatic_pipeline()
+    automatic_pipeline()
     # automatic_pipeline(5)
     # automatic_pipeline(300, offset=0)
 
