@@ -1,0 +1,5 @@
+
+[submodule "rdf_service_tasks/question_gen/c_owl"]
+	path = rdf_service_tasks/question_gen/c_owl
+	url = https://github.com/den1s0v/c_owl.git
+	branch = dtree
