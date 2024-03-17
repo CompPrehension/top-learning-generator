@@ -14,7 +14,8 @@ import sqlite_questions_metadata as dbmeta
 from service import _patch_and_parse_ttl, setQuestionSubgraphDB, getQuestionModelDB, solve_template_with_jena, \
     process_template, generate_data_for_question, read_access_config
 
-sys.path.insert(1, '../../../c_owl/')
+sys.path.insert(1, '../../../c_owl/')  # dev location
+sys.path.insert(2, 'c_owl/')  # desired deploy location
 from common_helpers import Checkpointer
 
 

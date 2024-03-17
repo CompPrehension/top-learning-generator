@@ -12,7 +12,8 @@ from rdf2alg_json import graph_2_json, fix_algorithm_graph
 from rdflib_utils import TripleOverrider
 
 
-sys.path.insert(1, '../../../c_owl/code_gen')
+sys.path.insert(1, '../../../c_owl/code_gen/')  # dev location
+sys.path.insert(2, 'c_owl/code_gen/')  # desired deploy location
 from render_code import render_code
 
 sys.path.insert(1, '../ctrl_flow_tools')

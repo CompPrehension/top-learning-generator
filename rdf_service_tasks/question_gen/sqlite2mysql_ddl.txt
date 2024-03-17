@@ -45,7 +45,7 @@ CREATE TABLE templates (
 
  ====>
 
-# to MySQL
+# to MySQL TODO: update columns !!
 DROP TABLE IF EXISTS questions_meta ;
 CREATE TABLE questions_meta (
     id                             INT  NOT NULL AUTO_INCREMENT,

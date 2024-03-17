@@ -1694,7 +1694,7 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         print("exception in generate_data_for_question:")
         print(e)
         print()
-        raise
+        ### raise
         q._stage += 10  # mark the error
         q.save()
         return None
