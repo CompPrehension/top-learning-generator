@@ -151,7 +151,7 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
 
 
 def update_bit_field(row_instance, field_name: str, new_bits: int, replace_mode=False):
-    ''' add/set bits to instance; do not save it. '''
+    """ add/set bits to instance; do not save it. """
     if not replace_mode:
         prev_value = getattr(row_instance, field_name) # or 0
         if prev_value:
@@ -162,7 +162,7 @@ def update_bit_field(row_instance, field_name: str, new_bits: int, replace_mode=
 
 
 def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, update_always=False):
-    ''' search record by `key_fields` and update it with `set_fields` '''
+    """ search record by `key_fields` and update it with `set_fields` """
     record, created = entity.get_or_create(**key_fields)
     need_save = False
     # if created:
@@ -187,7 +187,7 @@ def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, u
 
 
 def names_to_bitmask(names: list[str], entity=Concepts):
-    '''gather bits from records (creating new rows when not exist)'''
+    """gather bits from records (creating new rows when not exist)"""
     bitmask = 0
     for obj in (create_or_update({'name': name}, entity=entity) for name in names):
         try:
@@ -200,9 +200,9 @@ def names_to_bitmask(names: list[str], entity=Concepts):
 
 # https://stackoverflow.com/a/8898977/12824563
 def bits_on(n):
-    ''' iterate over set bits (1's) in int, ascending order
+    """ iterate over set bits (1's) in int, ascending order
         ex. bits_on(109) --> 1 4 8 32 64
-    '''
+    """
     while n:
         b = n & (~n+1)
         yield b
@@ -210,7 +210,7 @@ def bits_on(n):
 
 
 def bitmask_to_names(bits: int, entity=Concepts) -> list[str]:
-    '''read bits from records (skipping values that not exist)'''
+    """read bits from records (skipping values that not exist)"""
     names = []
     for bit in bits_on(bits):
         try:
