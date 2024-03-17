@@ -1671,6 +1671,10 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         # q_dict['metadata'] = metadata
         q_dict['questionData']['options']['metadata'] = metadata
 
+        # use proper metadata
+        q_dict["concepts"] = sorted(dbmeta.bitmask_to_names(q.concept_bits, entity=dbmeta.Concepts))
+        q_dict["negativeLaws"] = sorted(dbmeta.bitmask_to_names(q.violation_bits, entity=dbmeta.Violations))
+
 
         # fullname = nameForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")
         file_subpath = getSubpathForQuestionGraph(qname, GraphRole.QUESTION_DATA, file_ext=".json")

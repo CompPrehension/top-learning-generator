@@ -228,10 +228,15 @@ def _sort_linked_list(array, next_prop=URIRef(NS_code.get('next'))):
 
 # using output of ctrlstrct_run helper
 LEAF_ACTION_CLASSES = [s for s in (
-            ['algorithm', ] + ['return', 'break', 'continue', ] + ['while_loop', 'else-if', 'for_loop', 'do_while_loop',
-                                                                   'stmt', 'else', 'infinite_loop', 'alternative',
-                                                                   'foreach_loop', 'ntimes_loop', 'func', 'if',
-                                                                   'expr'] + ['sequence', 'boundary'])]
+            ['algorithm', ] +
+            ['return', 'break', 'continue', ] +
+            ['alternative_multi_with_else', 'alternative_multi_without_else',
+             'alternative_simple', 'alternative_single_with_else', 'break', 'continue',
+             'do_while_loop', 'else', 'else-if', 'expr', 'for_loop', 'foreach_loop', 'func',
+             'func_call', 'if', 'infinite_loop', 'loop_body', 'ntimes_loop', 'return',
+             'stmt', 'stmt_with_calls', 'while_loop'] +
+            ['sequence', 'boundary']
+)]
 
 
 class AlgorithmGraphWalker(GView):
