@@ -32,3 +32,14 @@ cmake -G "Visual Studio 16 2019" -S llvm -B _build_llvm ^
 - Go to the _build_llvm directory and open LLVM.sln
 - Run the build of clang and clang_tools projects
 - Change the paths for the compiled libraries in the project settings
+
+
+
+### Получение репозитория с генератором вопросов
+
+Склонировать с подмодулями:
+
+```
+git clone  --recurse-submodules https://github.com/CompPrehension/top-learning-generator.git
+```
+
