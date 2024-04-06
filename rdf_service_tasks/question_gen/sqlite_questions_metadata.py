@@ -8,9 +8,8 @@ else:
     # expression
     from db_utils.sqlite_orm_classes import *
 
-
 # write to `_version` column to track data generated with older scripts
-TOOL_VERSION = 9
+TOOL_VERSION = 10
 
 # some enum-like constants
 STAGE_QT_FOUND = 0
@@ -23,10 +22,9 @@ STAGE_Q_SOLVED = 2
 STAGE_Q_DATA_SAVED = 3
 
 
-
 def findQuestionOrTemplateByNameDB(name):
     obj = (Questions.get_or_none(Questions.name == name)
-        or Templates.get_or_none(Templates.name == name));
+           or Templates.get_or_none(Templates.name == name));
     if not obj:
         print("    (DB: No question or template found for name: %s)" % name)
     return obj
@@ -41,6 +39,7 @@ def findQuestionsOnStageDB(stage=1, limit=None, version=None):
     iterator = query.limit(limit).execute()
     return list(iterator)
 
+
 def findTemplatesOnStageDB(stage=1, limit=None, version=None):
     query = Templates.select()
     if stage:
@@ -52,7 +51,6 @@ def findTemplatesOnStageDB(stage=1, limit=None, version=None):
 
 
 def createQuestionTemplateDB(questionTemplateName, src_file_path=None) -> 'question template instance':
-
     qt = Templates.get_or_none(Templates.name == questionTemplateName)
 
     if not qt:
@@ -112,10 +110,10 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
     qt = q.template
 
     fields_of_collections = {
-        'has_tag':      (Tags,             'tag_bits'),
-        'has_concept':  (Concepts,     'concept_bits'),
-        'has_law':      (Laws,             'law_bits'),
-        'has_violation':(Violations, 'violation_bits'),
+        'has_tag': (Tags, 'tag_bits'),
+        'has_concept': (Concepts, 'concept_bits'),
+        'has_law': (Laws, 'law_bits'),
+        'has_violation': (Violations, 'violation_bits'),
     }
 
     need_save_qt = False
@@ -153,15 +151,14 @@ def createQuestionDB(questionName, template, q_graph=None, metrics={}) -> 'quest
 def update_bit_field(row_instance, field_name: str, new_bits: int, replace_mode=False):
     """ add/set bits to instance; do not save it. """
     if not replace_mode:
-        prev_value = getattr(row_instance, field_name) # or 0
+        prev_value = getattr(row_instance, field_name)  # or 0
         if prev_value:
             new_bits |= prev_value
 
     setattr(row_instance, field_name, new_bits)
 
 
-
-def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, update_always=False):
+def create_or_update(key_fields: dict, set_fields: dict = None, entity=Concepts, update_always=False):
     """ search record by `key_fields` and update it with `set_fields` """
     record, created = entity.get_or_create(**key_fields)
     need_save = False
@@ -174,7 +171,7 @@ def create_or_update(key_fields: dict, set_fields: dict=None, entity=Concepts, u
                 need_save = True
     if hasattr(record, 'bit') and not record.bit:
         # retrieve max bit value from table and then double it
-        max_bit = entity.select(fn.Max(entity.bit)).scalar() or 1/2  # smallest bit is 1
+        max_bit = entity.select(fn.Max(entity.bit)).scalar() or 1 / 2  # smallest bit is 1
         record.bit = int(2 * max_bit)  # fill bitmask's bit as desired by my businesslogic
         need_save = True
     if need_save:
@@ -204,7 +201,7 @@ def bits_on(n):
         ex. bits_on(109) --> 1 4 8 32 64
     """
     while n:
-        b = n & (~n+1)
+        b = n & (~n + 1)
         yield b
         n ^= b
 
@@ -214,9 +211,42 @@ def bitmask_to_names(bits: int, entity=Concepts) -> list[str]:
     names = []
     for bit in bits_on(bits):
         try:
-            names.append( entity.get(entity.bit == bit).name )
+            names.append(entity.get(entity.bit == bit).name)
         except DoesNotExist:  # peewee.DoesNotExist
             raise AttributeError('Not found entity of type %s with bit: $s' % (entity.__name__), str(bit))
     return names
 
 
+def fill_db_with_new_entities():
+
+    # 1. obtain entity names that must present in db tables with bitmask assigned
+
+    from analyze_alg import get_reason_to_negative_laws_mappings
+
+    # """ action_class_name -> {reason_name -> [violation names]} """
+    reason_to_negative_laws_mappings = get_reason_to_negative_laws_mappings()
+
+    class_names = sorted(set(reason_to_negative_laws_mappings.keys()))
+    positive_laws = sorted(set(
+        name
+        for d in reason_to_negative_laws_mappings.values()
+        for name in d.keys()
+    ))
+    negative_laws = sorted(set(
+        name
+        for d in reason_to_negative_laws_mappings.values()
+        for name_list in d.values()
+        for name in name_list
+    ))
+
+    # 2. Call bitmask constructor to create missing entries
+
+    names_to_bitmask(class_names, Concepts)
+    names_to_bitmask(positive_laws, Laws)
+    names_to_bitmask(negative_laws, Violations)
+
+    print('fill_db_with_new_entities() completed.')
+
+
+if __name__ == "__main__":
+    fill_db_with_new_entities()
