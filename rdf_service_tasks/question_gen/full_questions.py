@@ -14,9 +14,14 @@ from rdflib_utils import TripleOverrider
 
 sys.path.insert(1, '../../../c_owl/code_gen/')  # dev location
 sys.path.insert(2, 'c_owl/code_gen/')  # desired deploy location
+
 from render_code import render_code
 
 sys.path.insert(1, '../ctrl_flow_tools')
+if 0:
+    # just for debugger to see the code in different directory
+    from ..ctrl_flow_tools.html2img import html_string2jpg
+
 from html2img import html_string2jpg
 
 

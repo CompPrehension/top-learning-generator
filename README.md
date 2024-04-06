@@ -43,3 +43,10 @@ cmake -G "Visual Studio 16 2019" -S llvm -B _build_llvm ^
 git clone  --recurse-submodules https://github.com/CompPrehension/top-learning-generator.git
 ```
 
+Установить зависимости:
+```
+pip install -r requirements.txt
+pip install -r c_owl/requirements.txt
+```
+
+

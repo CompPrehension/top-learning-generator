@@ -9,10 +9,10 @@ from rdflib import Graph, RDF, RDFS
 from rdflib.term import URIRef, Literal
 
 # using patched version of SPARQLBurger
-from SPARQLBurger.SPARQLQueryBuilder import *
+# from SPARQLBurger.SPARQLQueryBuilder import *
 
 from ns4guestions import *
-from chain_utils import builder
+# from chain_utils import builder
 
 
 # PREFIXES = dict(

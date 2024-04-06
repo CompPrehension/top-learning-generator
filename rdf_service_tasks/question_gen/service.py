@@ -27,7 +27,7 @@ from chain_utils import builder
 # from NamespaceUtil import NamespaceUtil
 from ns4guestions import *
 from rdflib_utils import graph_lookup, get_class_descendants_rdf
-from sparql_wrapper import Sparql
+### from sparql_wrapper import Sparql
 
 # from sqlite_questions_metadata import findQuestionOrTemplateByNameDB, findQuestionsOnStageDB, findTemplatesOnStageDB, \
 #     createQuestionTemplateDB, createQuestionDB
@@ -43,8 +43,8 @@ from ctrlstrct_run import run_jenaService_with_rdfxml
 ### inspecting loading of qG
 from common_helpers import Checkpointer
 
-# using patched version of SPARQLBurger
-from SPARQLBurger.SPARQLQueryBuilder import *
+# # using patched version of SPARQLBurger
+# from SPARQLBurger.SPARQLQueryBuilder import *
 
 # print('imports completed.')
 
@@ -142,20 +142,20 @@ def get_file_service() -> RemoteFileService:
     return fileService
 
 
-def get_endpoint():
-    global sparql_endpoint
-    if sparql_endpoint:
-        return sparql_endpoint
+# def get_endpoint():
+#     global sparql_endpoint
+#     if sparql_endpoint:
+#         return sparql_endpoint
 
-    read_access_config()
-    sparql_endpoint = Sparql(
-        fuseki_host, rdf_db_name,
-        query_url=CONFIG.query_url,
-        update_url=CONFIG.update_url,
-        credentials=CONFIG.get('credentials'),
-        post_update_hooks=_get_rdfdb_stats_collectors()
-    )
-    return sparql_endpoint
+#     read_access_config()
+#     sparql_endpoint = Sparql(
+#         fuseki_host, rdf_db_name,
+#         query_url=CONFIG.query_url,
+#         update_url=CONFIG.update_url,
+#         credentials=CONFIG.get('credentials'),
+#         post_update_hooks=_get_rdfdb_stats_collectors()
+#     )
+#     return sparql_endpoint
 
 
 # if INIT_GLOBALS:

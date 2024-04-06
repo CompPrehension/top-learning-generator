@@ -226,7 +226,7 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--origin', default=None,
                         help='questions_origin: what to save in "origin" field of question metadata (`None`/`null` by default)')
     parser.add_argument('-n', '--limit', type=int, default=0,
-                        help='templates_limit: maximum templates to process; 0 (by default) means no limit.')
+                        help='templates_limit: maximum number templates to process; 0 (by default) means no limit.')
 
     args = vars(parser.parse_args())
     ### print(args)
@@ -237,4 +237,8 @@ if __name__ == "__main__":
     # example cmd ...
     '''
         python q_generator_main.py -i "c:/data/compp-gen/control_flow/parsed" -o "c:/data/compp-gen/control_flow/questions" -g "ag" -n 5
+
+    (the same, using long option names:)
+
+        python q_generator_main.py --input "c:/data/compp-gen/control_flow/parsed" --output "c:/data/compp-gen/control_flow/questions" --origin "ag" --limit 5
     '''
