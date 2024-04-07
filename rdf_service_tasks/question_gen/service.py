@@ -8,10 +8,13 @@
 import json
 import math
 import random  # using random.seed
+import os
 import re
 import sys
 from math import exp
 from statistics import fmean as avg
+
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 import fs
 import rdflib

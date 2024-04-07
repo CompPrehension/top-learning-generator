@@ -219,11 +219,11 @@ def save_output_question_file(q: dbmeta.Questions, output_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input', required=True,
+    parser.add_argument('-i', '--source', required=True,
                         help='input_templates_dir: path to a directory containing .ttl files with template data')
     parser.add_argument('-o', '--output', required=True,
                         help='output_questions_dir: path to a directory where to store resulting .json files with question data')
-    parser.add_argument('-g', '--origin', default=None,
+    parser.add_argument('-g', '--sourceId', default=None,
                         help='questions_origin: what to save in "origin" field of question metadata (`None`/`null` by default)')
     parser.add_argument('-n', '--limit', type=int, default=0,
                         help='templates_limit: maximum number templates to process; 0 (by default) means no limit.')
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
     ### print(args)
 
-    main(args['input'], args['output'], args["origin"], args['limit'])
+    main(args['source'], args['output'], args["sourceId"], args['limit'])
     # main("c:/data/compp-gen/control_flow/parsed", "c:/data/compp-gen/control_flow/questions", "ag", 5)
 
     # example cmd ...
@@ -240,5 +240,5 @@ if __name__ == "__main__":
 
     (the same, using long option names:)
 
-        python q_generator_main.py --input "c:/data/compp-gen/control_flow/parsed" --output "c:/data/compp-gen/control_flow/questions" --origin "ag" --limit 5
+        python q_generator_main.py --source "c:/data/compp-gen/control_flow/parsed" --output "c:/data/compp-gen/control_flow/questions" --sourceId "ag" --limit 5
     '''
