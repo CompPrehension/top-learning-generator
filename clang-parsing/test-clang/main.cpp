@@ -37,7 +37,10 @@ private:
     string outputDir;
 
 public:
-    ExprPrinter(string outputDir) : outputDir(outputDir) {
+    ExprPrinter(string outputDir) {
+        if (!outputDir.empty() && outputDir.back() != '\\' && outputDir.back() != '/')
+            outputDir += '/';
+        this->outputDir = outputDir;
     }
 
 
@@ -75,9 +78,7 @@ private:
             auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\s\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
-            // if file with this name already exists - skip this function            
-            if (!outputDir.empty() && outputDir.back() != '\\' && outputDir.back() != '/')
-                outputDir += '/';
+            // if file with this name already exists - skip this function
             if (fileExists(outputDir, fileNamePart))
             {
                 return;
