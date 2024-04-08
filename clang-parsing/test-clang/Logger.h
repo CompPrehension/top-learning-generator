@@ -23,9 +23,9 @@ public:
 class Logger 
 {
 public:
-	static void info(string msg)
+	static void info(string msg) 
 	{
-		Logger::buffer.push_back(LogEntity{ msg, chrono::system_clock::now(), LogLevel::INFO });
+		Logger::buffer.push_back(LogEntity{msg, chrono::system_clock::now(), LogLevel::INFO});
 	}
 
 	static void error(string msg)

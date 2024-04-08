@@ -12,9 +12,9 @@ using namespace std;
 
 
 ControlFlowDomainAlgo* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& astCtx, clang::SourceManager& mgr);
-ControlFlowDomainExprStmtNode* mapExprToControlflowDst(Expr *expr, ASTContext& astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeSet& calledFunctions);
+ControlFlowDomainExprStmtNode* mapExprToControlflowDst(Expr *expr, ASTContext& astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeMap& calledFunctions);
 ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& astCtx, clang::SourceManager &mgr, int funcDepth);
-ControlFlowDomainStmtNode* mapToControlflowDst(Stmt *stmt, ASTContext &astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeSet& calledFunctions);
+ControlFlowDomainStmtNode* mapToControlflowDst(Stmt *stmt, ASTContext &astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeMap& calledFunctions);
 
 std::string toOriginalCppString(ControlFlowDomainAlgo* algo, clang::SourceManager& mgr);
 std::string toCustomCppString(ControlFlowDomainAlgo* algo, clang::SourceManager& mgr, ASTContext& astCtx, bool isDebug = false);

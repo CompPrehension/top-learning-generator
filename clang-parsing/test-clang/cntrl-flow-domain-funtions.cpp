@@ -4,7 +4,7 @@ using namespace llvm;
 void findFunctionCalls(
     Stmt *stmt, 
     clang::SourceManager &mgr,
-    vector<clang::CallExpr *>& calls,
+    vector<tuple<int, clang::CallExpr *>>& calls,
     int depth = 0) {
   
   if (stmt == nullptr)
@@ -16,53 +16,37 @@ void findFunctionCalls(
         continue;
     }
 
-    calls.push_back(callExpr);
+    calls.push_back(tuple(depth, callExpr));
   }
 }
 
-vector<clang::CallExpr *> findFunctionCalls(Stmt *stmt, clang::SourceManager &mgr) {
-  vector<clang::CallExpr *> calls;
+vector<tuple<int, clang::CallExpr*>> findFunctionCalls(Stmt *stmt, clang::SourceManager &mgr) {
+  vector<tuple<int, clang::CallExpr*>> calls;
   findFunctionCalls(stmt, mgr, calls);
-  
-  auto fullExprSr = stmt->getSourceRange();
-  auto fullExpr = get_source_text(fullExprSr, mgr);
-  Logger::info("Source expr with fun calls " + fullExpr);
-  Logger::info("Source Range " + fullExprSr.printToString(mgr));
-
-  for (auto *call : calls) {
-
-    auto callExprSr = call->getSourceRange();
-    auto callExpr = get_source_text(call->getSourceRange(), mgr);
-    
-    Logger::info("Found func call " + callExpr);
-    Logger::info("Source Range " + callExprSr.printToString(mgr));
-  }
-
   return calls;
 }
 
-ControlFlowDomainExprStmtNode *mapExprToControlflowDst(Expr *expr, ASTContext& astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeSet& calledFunctions) {
+ControlFlowDomainExprStmtNode *mapExprToControlflowDst(Expr *expr, ASTContext& astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeMap& calledFunctions) {
     if (expr == nullptr)
         return nullptr;
+    
+    auto callsInExpr = findFunctionCalls(expr, mgr);
+    if (callsInExpr.size() > 0) {
+        //std::ranges::sort(callsInExpr, [](const tuple<int, clang::CallExpr*>& a, const tuple<int, clang::CallExpr*>& b) { return std::get<0>(a) > std::get<0>(b); });
 
-    // TODO analyze expr for fun calls
-    // пройтись по всем узлам выражения (вероятно от листьев к корню)
-    // искать подвыражения с вызовом, фиксировать их подстроки??????
-    // количестро аргументов при вызове
-    // вероятно в функции нужно хранить список вызываемых ункций в теле
-    auto calls = findFunctionCalls(expr, mgr);
-    if (calls.size() > 0) {
-        for (auto call: calls) {
+        for (auto [_, call]: callsInExpr) {
             auto decl = call->getDirectCallee();
-
-            // TODO check for recursion
-            if (decl) {
-                auto mappedDecl = mapToControlflowDst(decl, astCtx, mgr, funcDepth + 1);
-				calledFunctions.insert(mappedDecl);
-            }
+			int declId = decl->getID();
+            if (!decl)
+				continue;
+            if (calledFunctions.contains(declId))
+                continue;
+            
+            auto mappedDecl = mapToControlflowDst(decl, astCtx, mgr, funcDepth + 1);
+			calledFunctions[declId] = mappedDecl;
         }
 
-        return new ControlFlowDomainExprWithFuncCallsStmtNode(expr);
+        return new ControlFlowDomainExprWithFuncCallsStmtNode(expr, callsInExpr);
     }
     return new ControlFlowDomainExprStmtNode(expr);
 }
@@ -71,17 +55,18 @@ ControlFlowDomainAlgo* mapToControlflowDst(FunctionDecl* funcDecl, ASTContext& a
 {
 	auto rootF = mapToControlflowDst(funcDecl, astCtx, mgr, 0);
 	
-    ControlFlowDomainFuncDeclNodeSet allFunctions;
+    ControlFlowDomainFuncDeclNodeMap allFunctions;
     vector<ControlFlowDomainFuncDeclNode*> stack = { rootF };    
     while (stack.size() > 0) {
 		auto f = stack.back();
+        int fid = f->getAstNode()->getID();
         stack.pop_back();
 
-		if (allFunctions.find(f) != allFunctions.end()) {
+		if (allFunctions.contains(fid)) {
 			continue;
 		}
 
-		allFunctions.insert(f);
+		allFunctions[fid] = f;
 		stack.insert(stack.end(), f->getCalledFunctions().begin(), f->getCalledFunctions().end());
     }
 
@@ -93,12 +78,12 @@ ControlFlowDomainFuncDeclNode* mapToControlflowDst(FunctionDecl* funcDecl, ASTCo
     if (funcDecl == nullptr || !funcDecl->getBody() || (isa<clang::CompoundStmt>(funcDecl->getBody()) && dyn_cast<clang::CompoundStmt>(funcDecl->getBody())->body().empty()))
         return nullptr;
 
-    ControlFlowDomainFuncDeclNodeSet calledFunctions;
+    ControlFlowDomainFuncDeclNodeMap calledFunctions;
     auto body = mapToControlflowDst(funcDecl->getBody(), astCtx, mgr, funcDepth, calledFunctions);
     return new ControlFlowDomainFuncDeclNode(funcDecl, body, calledFunctions);
 }
 
-ControlFlowDomainStmtNode *mapToControlflowDst(Stmt *stmt, ASTContext &astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeSet& calledFunctions) {
+ControlFlowDomainStmtNode *mapToControlflowDst(Stmt *stmt, ASTContext &astCtx, clang::SourceManager &mgr, int funcDepth, ControlFlowDomainFuncDeclNodeMap& calledFunctions) {
     if (stmt == nullptr)
         return nullptr;
 
@@ -209,7 +194,7 @@ dump_and_return_undefined:
 std::string toOriginalCppString(ControlFlowDomainAlgo* algo, clang::SourceManager& mgr)
 {
     std::stringstream ss;
-    for (auto func: algo->getFunctions()) {
+    for (auto [_, func]: algo->getFunctions()) {
         ss << get_source_text(func->getAstNode()->getSourceRange(), mgr);
 		ss << "\n\n";
     }
@@ -411,7 +396,7 @@ void toCustomCppStringInner(std::stringstream& ss, ControlFlowDomainStmtNode* st
 std::string toCustomCppString(ControlFlowDomainAlgo* algo, clang::SourceManager & mgr, ASTContext& astCtx, bool isDebug)
 {
     std::stringstream ss;
-	for (auto func : algo->getFunctions())
+	for (auto [_, func] : algo->getFunctions())
 	{
         //func->getAstNode()->getDeclaredReturnType().getAsString()
         ss << func->getAstNode()->getDeclaredReturnType().getAsString() << " "

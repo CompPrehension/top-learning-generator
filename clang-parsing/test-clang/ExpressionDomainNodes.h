@@ -10,7 +10,7 @@ class ExpressionDomainNode
 public:
 	ExpressionDomainNode(Stmt* astNode)
 		: astNode(astNode)
-	{		
+	{
 	}
 
 	virtual ~ExpressionDomainNode()

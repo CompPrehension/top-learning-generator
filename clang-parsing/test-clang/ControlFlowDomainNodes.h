@@ -152,10 +152,15 @@ public:
 
 class ControlFlowDomainExprWithFuncCallsStmtNode : public ControlFlowDomainExprStmtNode {
 public:
-    ControlFlowDomainExprWithFuncCallsStmtNode(Expr *astNode)
-        : ControlFlowDomainExprStmtNode(astNode)
+    ControlFlowDomainExprWithFuncCallsStmtNode(Expr *astNode, vector<tuple<int, clang::CallExpr*>>& funcCalls)
+		: ControlFlowDomainExprStmtNode(astNode), funcCalls(funcCalls)
 	{
 	}
+
+	vector<tuple<int, clang::CallExpr*>>& getFuncCalls() { return this->funcCalls; }
+
+private:
+	vector<tuple<int, clang::CallExpr*>> funcCalls;
 };
 
 
@@ -600,12 +605,12 @@ struct ControlFlowDomainFuncDeclNodeHash {
 struct ControlFlowDomainFuncDeclNodeEq {
 	bool operator () (ControlFlowDomainFuncDeclNode* const& lhs, ControlFlowDomainFuncDeclNode* const& rhs) const;
 };
-#define ControlFlowDomainFuncDeclNodeMap std::unordered_map<ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNodeHash, ControlFlowDomainFuncDeclNodeEq>
+#define ControlFlowDomainFuncDeclNodeMap std::unordered_map<int, ControlFlowDomainFuncDeclNode*>
 #define ControlFlowDomainFuncDeclNodeSet std::unordered_set<ControlFlowDomainFuncDeclNode*, ControlFlowDomainFuncDeclNodeHash, ControlFlowDomainFuncDeclNodeEq>
 class ControlFlowDomainFuncDeclNode
 {
 public:
-	ControlFlowDomainFuncDeclNode(FunctionDecl* astNode, ControlFlowDomainStmtNode* body, ControlFlowDomainFuncDeclNodeSet& calledFunctions)
+	ControlFlowDomainFuncDeclNode(FunctionDecl* astNode, ControlFlowDomainStmtNode* body, ControlFlowDomainFuncDeclNodeMap& calledFunctions)
 		: astNode(astNode), body(body), calledFunctions(calledFunctions)
 	{
 	}
@@ -622,11 +627,11 @@ public:
 
 	FunctionDecl* getAstNode() { return this->astNode; }
 
-	ControlFlowDomainFuncDeclNodeSet& getCalledFunctions() { return this->calledFunctions; }
+	ControlFlowDomainFuncDeclNodeMap& getCalledFunctions() { return this->calledFunctions; }
 
 private:
 	ControlFlowDomainStmtNode* body;
-	ControlFlowDomainFuncDeclNodeSet calledFunctions;
+	ControlFlowDomainFuncDeclNodeMap calledFunctions;
 	FunctionDecl* astNode;
 };
 
@@ -643,23 +648,23 @@ class ControlFlowDomainAlgo
 {
 
 public:
-	ControlFlowDomainAlgo(ControlFlowDomainFuncDeclNodeSet& functions, ControlFlowDomainFuncDeclNode* root)
+	ControlFlowDomainAlgo(ControlFlowDomainFuncDeclNodeMap& functions, ControlFlowDomainFuncDeclNode* root)
 		: functions(functions), root(root) {
 	}
 	virtual ~ControlFlowDomainAlgo() {
-		for (auto x : this->functions) {
+		for (auto [_, x] : this->functions) {
 			delete x;
 		}
 	}
 
 	ControlFlowDomainFuncDeclNode* getRoot() { return this->root; }
 
-	ControlFlowDomainFuncDeclNodeSet& getFunctions() {
+	ControlFlowDomainFuncDeclNodeMap& getFunctions() {
 		return this->functions;
 	}
 
 private:
-	ControlFlowDomainFuncDeclNodeSet functions;
+	ControlFlowDomainFuncDeclNodeMap functions;
 	ControlFlowDomainFuncDeclNode* root = nullptr;
 };
 
