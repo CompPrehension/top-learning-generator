@@ -58,6 +58,13 @@ def main(input_templates_dir: str, output_questions_dir: str, questions_origin: 
         # создать в БД запись для шаблона
         qt = dbmeta.createQuestionTemplateDB(name, src_file_path=path)
         qt.origin = questions_origin
+        if qt.src_path != path:
+            # question loaded with existing data file
+            # if qt.src_path:
+                # TODO: remove old file once this change has confirmed (see below)??
+
+            # set new path to data file:
+            qt.src_path = path
 
         ok = load_template(qt, input_templates_dir)
         if not ok:
