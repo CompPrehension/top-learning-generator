@@ -1652,7 +1652,7 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         # fill metadata (CompP format) for the question
         metadata = dict(
             name = q.name,
-            domain_shortname = 'control_flow',
+            domain_shortname = 'ctrl_flow',
             template_id = q.template.id,
             qt_graph = None,
             qt_s_graph = None,
@@ -1671,7 +1671,7 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
             _stage = q._stage,
             _version = q._version,
         )
-        # q_dict['metadata'] = metadata
+        q_dict['metadata'] = metadata
         q_dict['questionData']['options']['metadata'] = metadata
 
         # use proper metadata
