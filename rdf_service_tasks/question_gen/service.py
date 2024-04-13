@@ -1630,6 +1630,11 @@ def generate_questions_for_templates(offset=None, limit=None):
 def generate_data_for_question(q_row_instance) -> 'q_row or None':
     """ generating data for question """
     q = q_row_instance
+
+    if q._stage < STAGE_Q_CREATED:
+        # question has not prepared correctly
+        return None
+
     qname = q.name
     g = getQuestionModelDB(q, GraphRole.QUESTION)
     # gl = graph_lookup(g, PREFIXES)
@@ -1652,24 +1657,24 @@ def generate_data_for_question(q_row_instance) -> 'q_row or None':
         # fill metadata (CompP format) for the question
         metadata = dict(
             name = q.name,
-            domain_shortname = 'ctrl_flow',
-            template_id = q.template.id,
-            qt_graph = None,
-            qt_s_graph = None,
-            q_graph = None,
-            q_s_graph = None,
-            q_data_graph = q.q_data_graph,
-            tag_bits = q.tag_bits,
-            concept_bits = q.concept_bits,
-            law_bits = q.law_bits,
-            violation_bits = q.violation_bits,
-            trace_concept_bits = q.trace_concept_bits,
-            solution_structural_complexity = q.solution_structural_complexity,
-            integral_complexity = q.integral_complexity,
-            solution_steps = q.solution_steps,
-            distinct_errors_count = q.distinct_errors_count,
-            _stage = q._stage,
-            _version = q._version,
+            domainShortname = 'ctrl_flow',
+            templateId = q.template.id,
+            qtGraphPath = None,
+            qtSolvedGraphPath = None,
+            qGraphPath = None,
+            qSolvedGraphPath = None,
+            qDataGraph = q.q_data_graph,
+            tagBits = q.tag_bits,
+            conceptBits = q.concept_bits,
+            lawBits = q.law_bits,
+            violationBits = q.violation_bits,
+            traceConceptBits = q.trace_concept_bits,
+            solutionStructuralComplexity = q.solution_structural_complexity,
+            integralComplexity = q.integral_complexity,
+            solutionSteps = q.solution_steps,
+            distinctErrorsCount = q.distinct_errors_count,
+            stage = q._stage,
+            version = q._version,
         )
         q_dict['metadata'] = metadata
         q_dict['questionData']['options']['metadata'] = metadata
