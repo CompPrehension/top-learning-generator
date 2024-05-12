@@ -73,7 +73,7 @@ private:
             auto rdfTree = mapToExressionDomainRdfNodes(dstNode);
             auto rdfString = rdfTreeToString(rdfTree);
 
-            auto expressionHash = (unsigned long long)std::hash<std::string>()(normalizedExpressionStr);
+            auto expressionHash = stable_hash(normalizedExpressionStr);
             auto time = std::time(0);
             auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\s\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
@@ -147,7 +147,7 @@ private:
             Logger::info(normalizedCode);
 
             // calculate output file name            
-            auto normalizedCodeHash = (unsigned long long)std::hash<std::string>()(normalizedCode);            
+            auto normalizedCodeHash = stable_hash(normalizedCode);
             auto functionId = functionName + string("__") + to_string(normalizedCodeHash);
 
             // if file with this name already exists - skip this function

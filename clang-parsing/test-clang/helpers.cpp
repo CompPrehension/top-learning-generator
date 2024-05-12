@@ -134,3 +134,17 @@ std::string getTimeStr(chrono::system_clock::time_point& time) {
     return s;
 }
 
+unsigned int stable_hash(const std::string& s)
+{
+    unsigned int hash = 0xAAAAAAAA;
+    unsigned int i = 0;
+
+    for (i = 0; i < s.size(); ++i)
+    {
+        auto chr = s[i];
+        hash ^= ((i & 1) == 0) ? ((hash << 7) ^ chr * (hash >> 3)) :
+            (~((hash << 11) + (chr ^ (hash >> 5))));
+    }
+
+    return hash;
+}

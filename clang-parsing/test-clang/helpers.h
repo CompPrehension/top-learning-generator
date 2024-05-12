@@ -68,3 +68,5 @@ bool IsType(const SrcType* src)
 {
     return dynamic_cast<const DstType*>(src) != nullptr;
 }
+
+unsigned int stable_hash(const std::string& s);
