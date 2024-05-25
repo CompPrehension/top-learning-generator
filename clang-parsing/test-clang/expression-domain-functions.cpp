@@ -82,7 +82,7 @@ bool isValidNode(ExpressionDomainNode* node)
     bool isValid = true;
     int operatorsCount = 0;
     isValidNodeInner(node, isValid, operatorsCount);
-    return isValid && operatorsCount >= 2;
+    return isValid && operatorsCount >= 2 && operatorsCount <= 50;
 }
 
 ExpressionDomainNode* mapToDst(const clang::Expr* node, clang::SourceManager* sourceMgr) {
