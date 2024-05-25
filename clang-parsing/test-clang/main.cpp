@@ -75,7 +75,7 @@ private:
 
             auto expressionHash = stable_hash(normalizedExpressionStr);
             auto time = std::time(0);
-            auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[\\s\\\"\\<\\>\\|\\:\\*\\?\\\\\\/]", "_");
+            auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[^a-zA-Z0-9_=+-]", "");
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
             // if file with this name already exists - skip this function
