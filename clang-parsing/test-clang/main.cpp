@@ -207,8 +207,8 @@ int main(int argc, const char** argv) {
     std::cout << typeid(int).name() << std::endl;
 
     auto domainName = string(argv[argc - 2]);    
-    if (domainName != "expression" && domainName != "control_flow") {
-        cout << "Invalid domain name - expected 'expression' or 'control_flow'" << endl;
+    if (domainName != "expression" && domainName != "ctrl_flow" && domainName != "control_flow") {
+        cout << "Invalid domain name - expected 'expression' or 'ctrl_flow'" << endl;
         return -1;
     }
     cout << "domain = " << domainName << endl;
