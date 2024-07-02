@@ -35,6 +35,7 @@ static cl::extrahelp MoreHelp("\nMore help text...\n");
 class ExprPrinter : public MatchFinder::MatchCallback {
 private:
     string outputDir;
+    unordered_set<string> processedIds;
 
 public:
     ExprPrinter(string outputDir) {
@@ -43,8 +44,17 @@ public:
         this->outputDir = outputDir;
     }
 
+    ~ExprPrinter() {
+        this->processedIds.clear();
+    }
+
 
     virtual void run(const MatchFinder::MatchResult& Result) {		
+        if (this->processedIds.size() > 100000)
+        {
+            return;
+        }
+        
         if (auto node = Result.Nodes.getNodeAs<clang::Expr>("exressionDomain"))
         {
             runForExpressionDomain(node, Result);
@@ -74,40 +84,44 @@ private:
             auto rdfString = rdfTreeToString(rdfTree);
 
             auto expressionHash = stable_hash(normalizedExpressionStr);
-            auto time = std::time(0);
             auto fileNamePart = stringRegexReplace(normalizedExpressionStr, "[^a-zA-Z0-9_=+-]", "");
             fileNamePart = fileNamePart.substr(0, 50) + string("__") + to_string(expressionHash);
 
-            // if file with this name already exists - skip this function
-            if (fileExists(outputDir, fileNamePart))
+            // skip existing
+            if (processedIds.count(fileNamePart))
             {
-                return;
+                goto finally_lbl;
             }
-
-            string filename = outputDir + fileNamePart + "__" + to_string(time) + ".ttl";
-            std::ofstream file(filename);
-            //file << "# Original expresson\n";
-            //file << "# " << stringReplace(stringReplace(stringReplace(rawExpr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
-            file << "# Normalized expression\n";
-            file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
-            file << "# " << "hash=" << expressionHash << "\n";
-            file << "\n\n";
-            file << "# rdf:\n\n";
-            file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
-            file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
-            file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
-            file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
-            file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
-            file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
-            file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
-
-            file << rdfString << "\n";
+            
+            {
+                auto time = std::time(0);
+                string filename = outputDir + fileNamePart + "__" + to_string(time) + ".ttl";
+                
+                std::ofstream file(filename);
+                //file << "# Original expresson\n";
+                //file << "# " << stringReplace(stringReplace(stringReplace(rawExpr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
+                file << "# Normalized expression\n";
+                file << "# " << stringReplace(stringReplace(stringReplace(normalizedExpressionStr, "\r\n", "\n"), "\n\r", "\n"), "\n", "\n# ") << "\n";
+                file << "# " << "hash=" << expressionHash << "\n";
+                file << "\n\n";
+                file << "# rdf:\n\n";
+                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
+                file << rdfString << "\n";
+            }
+            processedIds.insert(fileNamePart);
         } catch (const std::bad_cast &badCastEx) {
             std::cerr << badCastEx.what();
 		} catch (...) {
 			cout << "Unexpected error found" << endl;
 			Logger::error("Unexpected error found");
         }
+    finally_lbl:
         if (dstNode)
             delete dstNode;
     }
@@ -150,8 +164,8 @@ private:
             auto normalizedCodeHash = stable_hash(normalizedCode);
             auto functionId = functionName + string("__") + to_string(normalizedCodeHash);
 
-            // if file with this name already exists - skip this function
-            if (fileExists(outputDir, functionId))
+            // if already exists - skip this function
+            if (processedIds.count(functionId))
             {
                 goto finally_lbl;
             }
@@ -162,21 +176,24 @@ private:
             auto rdfString = ((ControlFlowDomainRdfNode*)rdfNode)->toString();
             Logger::info("Successfully converted to rdf");
 
-            shortFilename = algoName + ".ttl";
-            auto absolutePath = outputDir + shortFilename;
-            std::ofstream file(absolutePath);
-            file << "# rdf:\n\n";
-            file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
-            file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
-            file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
-            file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
-            file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
-            file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
-            file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
-            file << rdfString;
+            {
+                shortFilename = algoName + ".ttl";
+                auto absolutePath = outputDir + shortFilename;
+                std::ofstream file(absolutePath);
+                file << "# rdf:\n\n";
+                file << "@prefix : <http://vstu.ru/poas/code#> ." << "\n";
+                file << "@prefix owl: <http://www.w3.org/2002/07/owl#> ." << "\n";
+                file << "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> ." << "\n";
+                file << "@prefix xml: <http://www.w3.org/XML/1998/namespace> ." << "\n";
+                file << "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> ." << "\n";
+                file << "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> ." << "\n";
+                file << "@base <http://vstu.ru/poas/code> ." << "\n\n";
+                file << rdfString;
+            }
             
             Logger::info("RDF Successfully saved to file");
             isSuccess = true;
+            processedIds.insert(functionId);
         } catch (string& err) {
 			cout << "error: " << err << endl;
             Logger::error(err);
@@ -184,18 +201,17 @@ private:
 			cout << "Unexpected error found"<< endl;
             Logger::error("Unexpected error found");
         }
-
+        if (isSuccess && shortFilename.length() > 0)
+            Logger::saveAndClear(logsDir + shortFilename + ".log.txt");
+        else
+            Logger::saveAndClear(logsDir + "_______ERROR__" + functionName + "__" + to_string(std::time(0)) + ".log.txt");
+    
+    finally_lbl:
         if (dstNode)
             delete dstNode;
         if (rdfNode)
             delete rdfNode;
 
-        if (isSuccess && shortFilename.length() > 0)
-            Logger::saveAndClear(logsDir + shortFilename + ".log.txt");
-        else
-            Logger::saveAndClear(logsDir + "_______ERROR__" + functionName + "__" + to_string(std::time(0)) + ".log.txt");
-
-    finally_lbl:
         cout << "Processed function " << functionName << endl;
         Logger::clear();
     }
